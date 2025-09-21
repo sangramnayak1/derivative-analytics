@@ -16,9 +16,21 @@ scaffold for the NIFTY OI / PCR dashboard. The project is structured to run with
    docker compose build
    docker compose up -d
    ```
-3. Open the frontend in your browser: http://localhost:5173
+3. Access APIs.
+   - Open the frontend in your browser: http://localhost:5173
    - Backend API: http://localhost:8000/api/nifty/optionchain
    - Window stats: http://localhost:8000/api/nifty/window_stats?mode=FIXED
+4. Code change and build.
+   ```
+   docker compose build --no-cache frontend
+   docker compose build --no-cache backend
+   docker compose up -d
+   ```
+5. Debug and log check.
+   ```
+   docker compose logs --tail=200 frontend
+   curl -s http://localhost:8000/api/nifty/window_stats | jq .[0]
+   ```
 
 ## Run without Docker (dev)
 ### Backend
