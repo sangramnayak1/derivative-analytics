@@ -116,3 +116,36 @@ def compute_skew(df):
     ce_iv = med_iv.get('CE', np.nan)
     pe_iv = med_iv.get('PE', np.nan)
     return (pe_iv/ce_iv) if (ce_iv and not np.isnan(ce_iv)) else None
+
+# analytics.py (add near other helpers)
+
+def _sum_col_for_type(df, col_candidates, opt_type):
+    """Return integer sum of the first found column in col_candidates for opt_type rows."""
+    for c in col_candidates:
+        if c in df.columns:
+            # coerce to numeric safely and sum
+            s = pd.to_numeric(df.loc[df['optionType'] == opt_type, c], errors='coerce').fillna(0).sum()
+            return int(s)
+    return 0
+
+def compute_pcr_change(df):
+    """
+    Compute PCR change for a df as (sum PE OI_change) / (sum CE OI_change).
+    Returns tuple (pcr_change, pe_change_total, ce_change_total) where pcr_change is None
+    if CE change total is zero.
+    """
+    if df is None or df.empty:
+        return None, 0, 0
+
+    # common column name candidates for oi-change values
+    candidates = ['OI_change', 'oi_change', 'oiChange', 'change', 'change_in_OI', 'LTP_change']
+
+    ce_ch = _sum_col_for_type(df, candidates, 'CE')
+    pe_ch = _sum_col_for_type(df, candidates, 'PE')
+
+    if ce_ch == 0:
+        pcr_ch = None
+    else:
+        pcr_ch = (pe_ch / ce_ch)
+
+    return pcr_ch, pe_ch, ce_ch

@@ -24,7 +24,7 @@ scaffold for the NIFTY OI / PCR dashboard. The project is structured to run with
    ```
    docker compose build --no-cache frontend
    docker compose build --no-cache backend
-   docker compose up -d
+   docker compose up -d --build frontend
    ```
 5. Debug and log check.
    ```

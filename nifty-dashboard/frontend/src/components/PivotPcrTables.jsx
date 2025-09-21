@@ -89,7 +89,8 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
         const makeBucket = () => ({
             CE_OI: 0, PE_OI: 0,
             CE_vol: 0, PE_vol: 0,
-            CE_strikes: [], PE_strikes: [] // arrays of strike values that contributed
+            CE_OI_change: 0, PE_OI_change: 0,   // NEW: track OI changes
+            CE_strikes: [], PE_strikes: []      // arrays of strike values that contributed
         });
 
         const buckets = {
@@ -108,39 +109,51 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
             const ceVol = Number(srow.CE_vol || 0);
             const peVol = Number(srow.PE_vol || 0);
 
-            // always to total
+            // read change fields (may be undefined on older data; default to 0)
+            const ceOICh = Number(srow.CE_OI_change ?? srow.CE_OI_chng ?? 0);
+            const peOICh = Number(srow.PE_OI_change ?? srow.PE_OI_chng ?? 0);
+
+            // always to TOTAL
             buckets.TOTAL.CE_OI += ceOI;
             buckets.TOTAL.PE_OI += peOI;
             buckets.TOTAL.CE_vol += ceVol;
             buckets.TOTAL.PE_vol += peVol;
+            buckets.TOTAL.CE_OI_change += ceOICh;   // NEW
+            buckets.TOTAL.PE_OI_change += peOICh;   // NEW
             if (ceOI > 0) buckets.TOTAL.CE_strikes.push(st);
             if (peOI > 0) buckets.TOTAL.PE_strikes.push(st);
 
             if (st === atm) {
-                buckets.ATM.CE_OI += ceOI;
-                buckets.ATM.PE_OI += peOI;
-                buckets.ATM.CE_vol += ceVol;
-                buckets.ATM.PE_vol += peVol;
-                if (ceOI > 0) buckets.ATM.CE_strikes.push(st);
-                if (peOI > 0) buckets.ATM.PE_strikes.push(st);
+            buckets.ATM.CE_OI += ceOI;
+            buckets.ATM.PE_OI += peOI;
+            buckets.ATM.CE_vol += ceVol;
+            buckets.ATM.PE_vol += peVol;
+            buckets.ATM.CE_OI_change += ceOICh;   // NEW
+            buckets.ATM.PE_OI_change += peOICh;   // NEW
+            if (ceOI > 0) buckets.ATM.CE_strikes.push(st);
+            if (peOI > 0) buckets.ATM.PE_strikes.push(st);
             } else if (st < atm) {
-                // lower strikes: CE ITM, PE OTM
-                buckets.ITM.CE_OI += ceOI;
-                buckets.ITM.CE_vol += ceVol;
-                if (ceOI > 0) buckets.ITM.CE_strikes.push(st);
+            // lower strikes: CE ITM, PE OTM
+            buckets.ITM.CE_OI += ceOI;
+            buckets.ITM.CE_vol += ceVol;
+            buckets.ITM.CE_OI_change += ceOICh;   // NEW
+            if (ceOI > 0) buckets.ITM.CE_strikes.push(st);
 
-                buckets.OTM.PE_OI += peOI;
-                buckets.OTM.PE_vol += peVol;
-                if (peOI > 0) buckets.OTM.PE_strikes.push(st);
+            buckets.OTM.PE_OI += peOI;
+            buckets.OTM.PE_vol += peVol;
+            buckets.OTM.PE_OI_change += peOICh;   // NEW
+            if (peOI > 0) buckets.OTM.PE_strikes.push(st);
             } else { // st > atm
-                // higher strikes: PE ITM, CE OTM
-                buckets.ITM.PE_OI += peOI;
-                buckets.ITM.PE_vol += peVol;
-                if (peOI > 0) buckets.ITM.PE_strikes.push(st);
+            // higher strikes: PE ITM, CE OTM
+            buckets.ITM.PE_OI += peOI;
+            buckets.ITM.PE_vol += peVol;
+            buckets.ITM.PE_OI_change += peOICh;   // NEW
+            if (peOI > 0) buckets.ITM.PE_strikes.push(st);
 
-                buckets.OTM.CE_OI += ceOI;
-                buckets.OTM.CE_vol += ceVol;
-                if (ceOI > 0) buckets.OTM.CE_strikes.push(st);
+            buckets.OTM.CE_OI += ceOI;
+            buckets.OTM.CE_vol += ceVol;
+            buckets.OTM.CE_OI_change += ceOICh;   // NEW
+            if (ceOI > 0) buckets.OTM.CE_strikes.push(st);
             }
         }
 
@@ -150,21 +163,26 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
             const ceVol = obj.CE_vol || 0;
             const peVol = obj.PE_vol || 0;
 
+            const ceOICh = obj.CE_OI_change || 0; // NEW
+            const peOICh = obj.PE_OI_change || 0; // NEW
+
             const ceRange = (obj.CE_strikes && obj.CE_strikes.length)
-                ? `${Math.min(...obj.CE_strikes)} — ${Math.max(...obj.CE_strikes)}`
-                : "—";
+            ? `${Math.min(...obj.CE_strikes)} — ${Math.max(...obj.CE_strikes)}`
+            : "—";
             const peRange = (obj.PE_strikes && obj.PE_strikes.length)
-                ? `${Math.min(...obj.PE_strikes)} — ${Math.max(...obj.PE_strikes)}`
-                : "—";
+            ? `${Math.min(...obj.PE_strikes)} — ${Math.max(...obj.PE_strikes)}`
+            : "—";
 
             return {
-                CE_OI: ce,
-                PE_OI: pe,
-                CE_vol: ceVol,
-                PE_vol: peVol,
-                CE_range: ceRange,
-                PE_range: peRange,
-                PCR: ce ? (pe / ce) : (pe ? Infinity : null)
+            CE_OI: ce,
+            PE_OI: pe,
+            CE_vol: ceVol,
+            PE_vol: peVol,
+            CE_OI_change: ceOICh,    // NEW: expose to UI
+            PE_OI_change: peOICh,    // NEW: expose to UI
+            CE_range: ceRange,
+            PE_range: peRange,
+            PCR: ce ? (pe / ce) : (pe ? Infinity : null)
             };
         };
 
@@ -178,26 +196,25 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
         if (windowStats && windowStats.max_pain && windowStats.max_pain.max_pain_strike) {
             maxPain = windowStats.max_pain.max_pain_strike;
         } else if (windowStats && windowStats.max_pain && windowStats.max_pain.pain_map) {
-        const pm = windowStats.max_pain.pain_map;
-        let minVal = Number.POSITIVE_INFINITY, minStrike = null;
-        for (const k of Object.keys(pm)) {
+            const pm = windowStats.max_pain.pain_map;
+            let minVal = Number.POSITIVE_INFINITY, minStrike = null;
+            for (const k of Object.keys(pm)) {
             const v = Number(pm[k]);
             if (Number.isFinite(v) && v < minVal) { minVal = v; minStrike = Number(k); }
-        }
-        maxPain = minStrike;
+            }
+            maxPain = minStrike;
         } else {
-        // fallback: pick strike with max total OI
-        let best = null, bestVal = -1;
-        for (const r of strikeAgg) {
+            // fallback: pick strike with max total OI
+            let best = null, bestVal = -1;
+            for (const r of strikeAgg) {
             const total = (Number(r.CE_OI || 0) + Number(r.PE_OI || 0));
             if (total > bestVal) { bestVal = total; best = r.strike; }
-        }
-        maxPain = best;
+            }
+            maxPain = best;
         }
 
         return { ATM, ITM, OTM, TOTAL, maxPain };
     }, [strikeAgg, atmStrike, windowStats]);
-
 
   // ---- render ----
   return (
@@ -267,6 +284,8 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
                     <th style={{ textAlign: "left", padding: 6 }}>PE Range</th>   {/* new */}
                     <th style={{ textAlign: "right", padding: 6 }}>CE OI</th>
                     <th style={{ textAlign: "right", padding: 6 }}>PE OI</th>
+                    <th style={{ textAlign: "left", padding: 6 }}>CE OI Chng</th>
+                    <th style={{ textAlign: "left", padding: 6 }}>PE OI Chng</th>
                     <th style={{ textAlign: "right", padding: 6 }}>CE Vol</th>   {/* new */}
                     <th style={{ textAlign: "right", padding: 6 }}>PE Vol</th>   {/* new */}
                     <th style={{ textAlign: "right", padding: 6 }}>PCR</th>
@@ -279,10 +298,16 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
                         <td style={{ padding: 8 }}>OTM</td>
                         <td style={{ padding: 8 }}>{pcrData.OTM.CE_range}</td>
                         <td style={{ padding: 8 }}>{pcrData.OTM.PE_range}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.OTM.CE_OI)}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.OTM.PE_OI)}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.OTM.CE_vol)}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.OTM.PE_vol)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.OTM.CE_OI}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.OTM.PE_OI}</td>
+                        <td style={{ textAlign: "right", color: pcrData.OTM.CE_OI_change > 0 ? "green" : pcrData.OTM.CE_OI_change < 0 ? "red" : "inherit" }}>
+                            {pcrData.OTM.CE_OI_change == null ? "—" : pcrData.OTM.CE_OI_change}
+                        </td>
+                        <td style={{ textAlign: "right", color: pcrData.OTM.PE_OI_change > 0 ? "green" : pcrData.OTM.PE_OI_change < 0 ? "red" : "inherit" }}>
+                            {pcrData.OTM.PE_OI_change == null ? "—" : pcrData.OTM.PE_OI_change}
+                        </td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.OTM.CE_vol}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.OTM.PE_vol}</td>
                         <td style={{ padding: 8, textAlign: "right" }}>{pcrData.OTM.PCR == null ? "—" : Number(pcrData.OTM.PCR).toFixed(3)}</td>
                         { /* ensure numeric CE/PE OI used for PCR so UI always matches */ }
                         {/*{ (() => {
@@ -301,10 +326,16 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
                         <td style={{ padding: 8 }}>ATM</td>
                         <td style={{ padding: 8 }}>{pcrData.ATM.CE_range}</td>
                         <td style={{ padding: 8 }}>{pcrData.ATM.PE_range}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ATM.CE_OI)}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ATM.PE_OI)}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ATM.CE_vol)}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ATM.PE_vol)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ATM.CE_OI}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ATM.PE_OI}</td>
+                        <td style={{ textAlign: "right", color: pcrData.ATM.CE_OI_change > 0 ? "green" : pcrData.ATM.CE_OI_change < 0 ? "red" : "inherit" }}>
+                            {pcrData.ATM.CE_OI_change == null ? "—" : pcrData.ATM.CE_OI_change}
+                        </td>
+                        <td style={{ textAlign: "right", color: pcrData.ATM.PE_OI_change > 0 ? "green" : pcrData.ATM.PE_OI_change < 0 ? "red" : "inherit" }}>
+                            {pcrData.ATM.PE_OI_change == null ? "—" : pcrData.ATM.PE_OI_change}
+                        </td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ATM.CE_vol}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ATM.PE_vol}</td>
                         <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ATM.PCR == null ? "—" : Number(pcrData.ATM.PCR).toFixed(3)}</td>
                         { /* ensure numeric CE/PE OI used for PCR so UI always matches */ }
                         {/*{ (() => {
@@ -323,10 +354,16 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
                         <td style={{ padding: 8 }}>ITM</td>
                         <td style={{ padding: 8 }}>{pcrData.ITM.CE_range}</td>
                         <td style={{ padding: 8 }}>{pcrData.ITM.PE_range}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ITM.CE_OI)}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ITM.PE_OI)}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ITM.CE_vol)}</td>
-                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ITM.PE_vol)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ITM.CE_OI}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ITM.PE_OI}</td>
+                        <td style={{ textAlign: "right", color: pcrData.ITM.CE_OI_change > 0 ? "green" : pcrData.ITM.CE_OI_change < 0 ? "red" : "inherit" }}>
+                            {pcrData.ITM.CE_OI_change == null ? "—" : pcrData.ITM.CE_OI_change}
+                        </td>
+                        <td style={{ textAlign: "right", color: pcrData.ITM.PE_OI_change > 0 ? "green" : pcrData.ITM.PE_OI_change < 0 ? "red" : "inherit" }}>
+                            {pcrData.ITM.PE_OI_change == null ? "—" : pcrData.ITM.PE_OI_change}
+                        </td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ITM.CE_vol}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ITM.PE_vol}</td>
                         <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ITM.PCR == null ? "—" : Number(pcrData.ITM.PCR).toFixed(3)}</td>
                         { /* ensure numeric CE/PE OI used for PCR so UI always matches */ }
                         {/*{ (() => {
@@ -346,10 +383,12 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
                         <td style={{ padding: 8, fontWeight: 700 }}>TOTAL</td>
                         <td style={{ padding: 8 }}></td>
                         <td style={{ padding: 8 }}></td>
-                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{fmtNum(pcrData.TOTAL.CE_OI)}</td>
-                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{fmtNum(pcrData.TOTAL.PE_OI)}</td>
-                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{fmtNum(pcrData.TOTAL.CE_vol)}</td>
-                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{fmtNum(pcrData.TOTAL.PE_vol)}</td>
+                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{pcrData.TOTAL.CE_OI}</td>
+                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{pcrData.TOTAL.PE_OI}</td>
+                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{pcrData.TOTAL.CE_OI_change}</td>
+                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{pcrData.TOTAL.PE_OI_change}</td>
+                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{pcrData.TOTAL.CE_vol}</td>
+                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{pcrData.TOTAL.PE_vol}</td>
                         {/*<td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>
                         { (windowStats?.pcr_window ?? pcrData.TOTAL.PCR) == null
                             ? "—"
@@ -362,6 +401,8 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
                     <tr>
                         <td style={{ padding: 8 }}>Max Pain</td>
                         <td style={{ padding: 8 }}>{pcrData.maxPain ?? "—"}</td>
+                        <td style={{ padding: 8 }}></td>
+                        <td style={{ padding: 8 }}></td>
                         <td style={{ padding: 8 }}></td>
                         <td style={{ padding: 8 }}></td>
                         <td style={{ padding: 8 }}></td>

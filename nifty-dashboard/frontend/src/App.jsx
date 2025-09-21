@@ -460,6 +460,22 @@ export default function App() {
     tooltip: { enabled: true, shared: false }
   }), [yMinMax, xMinMax]);
 
+  // inside component that has windowStats from API
+  const { pcr_window, pcr_window_ch, pcr_window_ch_details, vwap } = stats || {};
+
+  const pcrSuggestion = useMemo(() => {
+    if (pcr_window == null) return null;
+
+    if (pcr_window > 1.2) {
+      return { side: "CE", text: `Suggest: CE BUY (PCR > 1.2) (PCR ${pcr_window.toFixed(3)})`, color: "#074" };
+    }
+    if (pcr_window < 0.8) {
+      return { side: "PE", text: `Suggest: PE BUY (PCR < 0.8) (PCR ${pcr_window.toFixed(3)})`, color: "#a00" };
+    }
+    // Sideways case (between 0.8 and 1.2 inclusive)
+    return { side: "SIDEWAYS", text: `Suggest: Sideways (PCR ${pcr_window.toFixed(3)})`, color: "#555" };
+  }, [pcr_window]);
+
 
   function onExportCSV() {
     const flat = strikeAgg.map((r) => ({
@@ -474,33 +490,106 @@ export default function App() {
 
   return (
     <div style={{ padding: 18, background: "#f3f4f6", minHeight: "100vh" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", background: "#fff", padding: 18, borderRadius: 8 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div
+        style={{
+          maxWidth: 1200,
+          margin: "0 auto",
+          background: "#fff",
+          padding: 18,
+          borderRadius: 8,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <h1 style={{ margin: 0 }}>NIFTY OI Dashboard</h1>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <select style={{ padding: "6px 10px" }} value={pollMs} onChange={(e)=>setPollMs(Number(e.target.value))}>
-              {POLL_OPTIONS.map(o=> <option key={o.value} value={o.value}>Poll: {o.label}</option>)}
+            <select
+              style={{ padding: "6px 10px" }}
+              value={pollMs}
+              onChange={(e) => setPollMs(Number(e.target.value))}
+            >
+              {POLL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  Poll: {o.label}
+                </option>
+              ))}
             </select>
-            <button onClick={fetchAll} className="px-3 py-1 bg-sky-600 text-white rounded" style={{ padding: "6px 10px" }}>Fetch</button>
-            <button onClick={onExportCSV} className="px-3 py-1 bg-sky-600 text-white rounded" style={{ padding: "6px 10px" }}><DownloadCloud size={16} /> Export CSV</button>
+            <button
+              onClick={fetchAll}
+              className="px-3 py-1 bg-sky-600 text-white rounded"
+              style={{ padding: "6px 10px" }}
+            >
+              Fetch
+            </button>
+            <button
+              onClick={onExportCSV}
+              className="px-3 py-1 bg-sky-600 text-white rounded"
+              style={{ padding: "6px 10px" }}
+            >
+              <DownloadCloud size={16} /> Export CSV
+            </button>
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, marginTop: 16 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "320px 1fr",
+            gap: 16,
+            marginTop: 16,
+          }}
+        >
           <div>
-            <div style={{ padding: 12, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff" }}>
+            <div
+              style={{
+                padding: 12,
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                background: "#fff",
+              }}
+            >
               <div style={{ fontSize: 12, color: "#6b7280" }}>Underlying</div>
-              <div style={{ fontSize: 24, fontWeight: 600 }}>{underlying ?? "-"}</div>
-              <div style={{ marginTop: 8 }}>ATM: <strong>{atmStrike ?? "-"}</strong></div>
-              <div style={{ marginTop: 8 }}>Overall PCR: <strong>{safeNum(stats?.pcr_overall,3)}</strong></div>
-              <div style={{ marginTop: 8 }}>Max Pain: <strong>{stats?.max_pain?.max_pain_strike ?? "-"}</strong></div>
+              <div style={{ fontSize: 24, fontWeight: 600 }}>
+                {underlying ?? "-"}
+              </div>
+              <div style={{ marginTop: 8 }}>
+                ATM: <strong>{atmStrike ?? "-"}</strong>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                Overall PCR: <strong>{safeNum(stats?.pcr_overall, 3)}</strong>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                Max Pain:{" "}
+                <strong>{stats?.max_pain?.max_pain_strike ?? "-"}</strong>
+              </div>
             </div>
 
-            <div style={{ marginTop: 12, padding: 12, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff" }}>
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                background: "#fff",
+              }}
+            >
               <div style={{ fontWeight: 600, marginBottom: 6 }}>Expiry</div>
-              <select value={selectedExpiry || ""} onChange={(e) => setSelectedExpiry(e.target.value)} style={{ width: "100%", padding: 6 }}>
+              <select
+                value={selectedExpiry || ""}
+                onChange={(e) => setSelectedExpiry(e.target.value)}
+                style={{ width: "100%", padding: 6 }}
+              >
                 <option value="">-- select expiry --</option>
-                {expiryOptions.map((e) => (<option key={e} value={e}>{new Date(e).toLocaleDateString()}</option>))}
+                {expiryOptions.map((e) => (
+                  <option key={e} value={e}>
+                    {new Date(e).toLocaleDateString()}
+                  </option>
+                ))}
               </select>
 
               {/* Strike filter */}
@@ -511,19 +600,32 @@ export default function App() {
                     type="number"
                     placeholder="min"
                     value={strikeMin ?? ""}
-                    onChange={(e) => { setManualOverride(true); setStrikeMin(e.target.value ? Number(e.target.value) : null); }}
-                    style={{ width: 110, padding: 6, height: 14 }}
+                    onChange={(e) => {
+                      setManualOverride(true);
+                      setStrikeMin(
+                        e.target.value ? Number(e.target.value) : null
+                      );
+                    }}
+                    style={{ width: 110, padding: 6, height: 12 }}
                   />
                   <input
                     type="number"
                     placeholder="max"
                     value={strikeMax ?? ""}
-                    onChange={(e) => { setManualOverride(true); setStrikeMax(e.target.value ? Number(e.target.value) : null); }}
-                    style={{ width: 110, padding: 6, height: 14 }}
+                    onChange={(e) => {
+                      setManualOverride(true);
+                      setStrikeMax(
+                        e.target.value ? Number(e.target.value) : null
+                      );
+                    }}
+                    style={{ width: 110, padding: 6, height: 12 }}
                   />
-                  <button className="px-3 py-1 bg-sky-600 text-white rounded"
-                    onClick={() => { setStrikeMin(null); setStrikeMax(null); }}
-                    style={{ padding: "4px 4px" }}
+                  <button
+                    className="px-3 py-1 bg-sky-600 text-white rounded"
+                    onClick={() => {
+                      setStrikeMin(null);
+                      setStrikeMax(null);
+                    }}
                   >
                     Reset
                   </button>
@@ -532,248 +634,543 @@ export default function App() {
 
               <div style={{ marginTop: 12 }}>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <button onClick={() => { setWindowMode("FIXED"); setManualOverride(false); }} style={{ padding: "6px 8px", background: windowMode === "FIXED" ? "#0369a1" : "#f3f4f6", color: windowMode === "FIXED" ? "#fff" : "#000" }}>Fixed (Spot±)</button>
-                  <button onClick={() => { setWindowMode("DYNAMIC"); setManualOverride(false); }} style={{ padding: "6px 8px", background: windowMode === "DYNAMIC" ? "#0369a1" : "#f3f4f6", color: windowMode === "DYNAMIC" ? "#fff" : "#000" }}>Dynamic (± strikes)</button>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
-                    <input type="checkbox" checked={lockMinMax} onChange={(e) => setLockMinMax(e.target.checked)} /> Lock
+                  <button
+                    onClick={() => {
+                      setWindowMode("FIXED");
+                      setManualOverride(false);
+                    }}
+                    style={{
+                      padding: "6px 8px",
+                      background:
+                        windowMode === "FIXED" ? "#0369a1" : "#f3f4f6",
+                      color: windowMode === "FIXED" ? "#fff" : "#000",
+                    }}
+                  >
+                    Fixed (Spot±)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setWindowMode("DYNAMIC");
+                      setManualOverride(false);
+                    }}
+                    style={{
+                      padding: "6px 8px",
+                      background:
+                        windowMode === "DYNAMIC" ? "#0369a1" : "#f3f4f6",
+                      color: windowMode === "DYNAMIC" ? "#fff" : "#000",
+                    }}
+                  >
+                    Dynamic (± strikes)
+                  </button>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      marginLeft: 8,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={lockMinMax}
+                      onChange={(e) => setLockMinMax(e.target.checked)}
+                    />{" "}
+                    Lock
                   </label>
                 </div>
 
                 <div style={{ marginTop: 8 }}>
-                  <div style={{ fontSize: 12 }}>ATM window (strikes each side)</div>
-                  <input type="range" min={1} max={20} value={atmWindow} onChange={(e) => setAtmWindow(Number(e.target.value))} />
-                  <div style={{ fontSize: 12 }}>{atmWindow} strikes each side</div>
+                  <div style={{ fontSize: 12 }}>
+                    ATM window (strikes each side)
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={20}
+                    value={atmWindow}
+                    onChange={(e) => setAtmWindow(Number(e.target.value))}
+                  />
+                  <div style={{ fontSize: 12 }}>
+                    {atmWindow} strikes each side
+                  </div>
                 </div>
               </div>
 
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 12 }}>PCR mode</div>
-                <select value={pcrMode} onChange={(e) => setPcrMode(e.target.value)}>
+                <select
+                  value={pcrMode}
+                  onChange={(e) => setPcrMode(e.target.value)}
+                >
                   <option value="OI">OI-based</option>
                   <option value="VOLUME">Volume-based</option>
                 </select>
                 <div style={{ marginTop: 6 }}>
-                  <label><input type="checkbox" checked={excludeZeroSide} onChange={(e) => setExcludeZeroSide(e.target.checked)} /> Exclude strikes with zero CE/PE for overall PCR</label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={excludeZeroSide}
+                      onChange={(e) => setExcludeZeroSide(e.target.checked)}
+                    />{" "}
+                    Exclude strikes with zero CE/PE for overall PCR
+                  </label>
                 </div>
               </div>
             </div>
           </div>
 
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 12 }}>
-            <div style={{ padding: 12, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff" }}>
-              <h3 style={{ marginTop: 0 }}>OI Profile (CE vs PE)</h3>
-              <div style={{ width: "100%", height: 320 }}>
+          <div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 360px",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  padding: 12,
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 6,
+                  background: "#fff",
+                }}
+              >
+                <h3 style={{ marginTop: 0 }}>OI Profile (CE vs PE)</h3>
+                <div style={{ width: "100%", height: 320 }}>
+                  <ResponsiveContainer>
+                    <ComposedChart data={oiProfileData}>
+                      <XAxis dataKey="strike" />
+                      <YAxis />
+                      <Tooltip formatter={(v) => fmt(v)} />
+                      <Legend />
+                      <Bar dataKey="CE_OI" name="CE OI" fill="#1f77b4" />{" "}
+                      {/* blue for CE */}
+                      <Bar dataKey="PE_OI" name="PE OI" fill="#ff7f0e" />{" "}
+                      {/* orange for PE */}
+                      <Line
+                        dataKey="total_OI"
+                        name="Total OI"
+                        stroke="#111827"
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div>
+                <div
+                  className="p-3 border rounded space-y-3 bg-white"
+                  style={{
+                    padding: 12,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 6,
+                  }}
+                >
+                  <h3 className="font-medium">Window Summary</h3>
+                  <div className="text-sm">
+                    <div>
+                      <strong>ATM:</strong> {stats?.atm ?? "-"}
+                    </div>
+                    <div>
+                      <strong>Range:</strong> {stats?.low ?? "-"} —{" "}
+                      {stats?.high ?? "-"}
+                    </div>
+                    <div>
+                      <strong>Overall PCR:</strong>{" "}
+                      {safeNum(stats?.pcr_overall, 3)}
+                    </div>
+                    <div>
+                      <strong>Window PCR:</strong>{" "}
+                      {safeNum(stats?.pcr_window, 3)}
+                    </div>
+                    <div style={{ marginBottom: 8 }}>
+                      <strong>PCR Change (PE/CE):</strong>{" "}
+                      {pcr_window_ch != null ? pcr_window_ch.toFixed(4) : "—"}
+                      {pcr_window_ch_details && (
+                        <span style={{ marginLeft: 12, color: "#666" }}>
+                          (PE Δ:{" "}
+                          {pcr_window_ch_details.PE_change ??
+                            pcr_window_ch_details.PE_change ??
+                            0}{" "}
+                          / CE Δ:{" "}
+                          {pcr_window_ch_details.CE_change ??
+                            pcr_window_ch_details.CE_change ??
+                            0}
+                          )
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ marginBottom: 8 }}>
+                      <strong>VWAP (PE / CE):</strong>{" "}
+                      {vwap?.PE ? vwap.PE.toFixed(3) : "—"} /{" "}
+                      {vwap?.CE ? vwap.CE.toFixed(3) : "—"}
+                    </div>
+
+                    {pcrSuggestion && (
+                      <div
+                        style={{
+                          background: pcrSuggestion.color + "18",
+                          color: pcrSuggestion.color,
+                          padding: "8px 10px",
+                          borderRadius: 6,
+                          display: "inline-block",
+                        }}
+                      >
+                        {pcrSuggestion.text}
+                      </div>
+                    )}
+                    <div>
+                      <strong>Skew (med PE IV / med CE IV):</strong>{" "}
+                      {safeNum(stats?.skew, 3)}
+                    </div>
+                    <div>
+                      <strong>Max Pain:</strong>{" "}
+                      {stats?.max_pain?.max_pain_strike ?? "-"}
+                    </div>
+                  </div>
+                  <div className="text-sm">
+                    <div>
+                      <strong>Prev Close:</strong>{" "}
+                      {indexOhlc?.prev_close ?? "-"}
+                    </div>
+                    <div>
+                      <strong>Open:</strong> {indexOhlc?.open ?? "-"}
+                    </div>
+                    <div>
+                      <strong> High:</strong> {indexOhlc?.high ?? "-"}
+                    </div>
+                    <div>
+                      <strong> Low:</strong> {indexOhlc?.low ?? "-"}
+                    </div>
+                    <div>
+                      <strong> Last:</strong> {indexOhlc?.last ?? "-"}
+                    </div>
+                    {/*<div><strong> Momentum:</strong> {indexOhlc?.momentum ?? "-"}</div>*/}
+                    <div>
+                      <strong> Momentum:</strong>{" "}
+                      {safeNum(indexOhlc?.momentum ?? "-", 2)}
+                    </div>
+                    <div>
+                      <strong>Avg:</strong>{" "}
+                      {indexOhlc?.avg_val?.toFixed(2) ?? "-"}
+                    </div>
+                    <div>
+                      <strong>Close - Avg:</strong>{" "}
+                      {indexOhlc && indexOhlc.last && indexOhlc.avg_val
+                        ? (indexOhlc.last - indexOhlc.avg_val).toFixed(2)
+                        : "-"}
+                    </div>
+                    <div>
+                      <strong>Trend:</strong>{" "}
+                      {indexOhlc && indexOhlc.last && indexOhlc.avg_val ? (
+                        <span
+                          style={{
+                            color:
+                              indexOhlc.last > indexOhlc.avg_val
+                                ? "green"
+                                : "red",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {indexOhlc.last > indexOhlc.avg_val
+                            ? "Uptrend"
+                            : "Downtrend"}
+                        </span>
+                      ) : (
+                        "-"
+                      )}
+                    </div>
+                  </div>
+                  <div
+                    className="text-xs text-gray-500"
+                    style={{ marginTop: 8 }}
+                  >
+                    Polling: {pollMs ? `${pollMs / 1000}s` : "Manual"}
+                  </div>
+                  <div>
+                    <strong>Advance:</strong> {marketStats?.advance ?? "-"}
+                  </div>
+                  <div>
+                    <strong>Decline:</strong> {marketStats?.decline ?? "-"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                background: "#fff",
+              }}
+            >
+              <h3 style={{ marginTop: 0 }}>OI by Expiry (stacked area)</h3>
+              <div style={{ width: "100%", height: 220 }}>
                 <ResponsiveContainer>
-                  <ComposedChart data={oiProfileData}>
-                    <XAxis dataKey="strike" />
+                  <AreaChart data={expiryAreaData}>
+                    <XAxis
+                      dataKey="expiry"
+                      tickFormatter={(v) => new Date(v).toLocaleDateString()}
+                    />
                     <YAxis />
-                    <Tooltip formatter={(v) => fmt(v)} />
-                    <Legend />
-                    <Bar dataKey="CE_OI" name="CE OI" fill="#1f77b4" />   {/* blue for CE */}
-                    <Bar dataKey="PE_OI" name="PE OI" fill="#ff7f0e" />   {/* orange for PE */}
-                    <Line dataKey="total_OI" name="Total OI" stroke="#111827" />
-                  </ComposedChart>
+                    <Tooltip />
+                    <Area
+                      type="monotone"
+                      dataKey="CE_OI"
+                      stackId="1"
+                      name="CE OI"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="PE_OI"
+                      stackId="1"
+                      name="PE OI"
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div>
-              <div className="p-3 border rounded space-y-3 bg-white" style={{padding:12, border:"1px solid #e5e7eb", borderRadius:6}}>
-                <h3 className="font-medium">Window Summary</h3>
-                <div className="text-sm">
-                  <div><strong>ATM:</strong> {stats?.atm ?? "-"}</div>
-                  <div><strong>Range:</strong> {stats?.low ?? "-"} — {stats?.high ?? "-"}</div>
-                  <div><strong>Overall PCR:</strong> {safeNum(stats?.pcr_overall,3)}</div>
-                  <div><strong>Window PCR:</strong> {safeNum(stats?.pcr_window,3)}</div>
-                  <div><strong>Skew (med PE IV / med CE IV):</strong> {safeNum(stats?.skew,3)}</div>
-                  <div><strong>Max Pain:</strong> {stats?.max_pain?.max_pain_strike ?? "-"}</div>
-                </div>
-                <div className="text-sm">
-                  <div><strong>Prev Close:</strong> {indexOhlc?.prev_close ?? "-"}</div>
-                  <div><strong>Open:</strong> {indexOhlc?.open ?? "-"}</div>
-                  <div><strong> High:</strong> {indexOhlc?.high ?? "-"}</div>
-                  <div><strong> Low:</strong> {indexOhlc?.low ?? "-"}</div>
-                  <div><strong> Last:</strong> {indexOhlc?.last ?? "-"}</div>
-                  {/*<div><strong> Momentum:</strong> {indexOhlc?.momentum ?? "-"}</div>*/}
-                  <div><strong> Momentum:</strong> {safeNum(indexOhlc?.momentum ?? "-",2)}</div>
-                  <div><strong>Avg:</strong> {indexOhlc?.avg_val?.toFixed(2) ?? "-"}</div>
-                  <div><strong>Close - Avg:</strong> {indexOhlc && indexOhlc.last && indexOhlc.avg_val
-                      ? (indexOhlc.last - indexOhlc.avg_val).toFixed(2)
-                      : "-"}
-                  </div>
-                  <div>
-                    <strong>Trend:</strong>{" "}
-                    {indexOhlc && indexOhlc.last && indexOhlc.avg_val ? (
-                      <span
-                        style={{
-                          color: indexOhlc.last > indexOhlc.avg_val ? "green" : "red",
-                          fontWeight: 600
-                        }}
-                      >
-                        {indexOhlc.last > indexOhlc.avg_val ? "Uptrend" : "Downtrend"}
-                      </span>
-                    ) : (
-                      "-"
-                    )}
-                  </div>
-                </div>
-                <div className="pt-2 border-t" style={{marginTop:8}}>
-                  <div><strong>VWAP (CE):</strong> {safeNum(stats?.vwap?.CE,3)}</div>
-                  <div><strong>VWAP (PE):</strong> {safeNum(stats?.vwap?.PE,3)}</div>
-                </div>
-
-                {suggestion && (
-                  <div style={{padding:8, marginTop:8, borderRadius:6, background: suggestion.side==="CE" ? "#ecfdf5":"#fffbeb"}}>
-                    <strong>Suggest:</strong> {suggestion.text} {suggestion.details ? <span>({suggestion.details})</span> : null}
-                  </div>
-                )}
-
-                <div className="text-xs text-gray-500" style={{marginTop:8}}>Polling: {pollMs ? `${pollMs/1000}s` : "manual"}</div>
-
-                <div><strong>Advance:</strong> {marketStats?.advance ?? "-"}</div>
-                <div><strong>Decline:</strong> {marketStats?.decline ?? "-"}</div>
-
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                background: "#fff",
+              }}
+            >
+              <h3 style={{ marginTop: 0 }}>Underlying Candles</h3>
+              <div>
+                {/* optionally show the raw indexOhlc for debug */}
+                {/*<pre style={{fontSize:12}}>{indexOhlc ? JSON.stringify(indexOhlc, null, 2) : "indexOhlc: loading..."}</pre>*/}
+                <Chart
+                  options={candleOptions}
+                  series={candleSeries}
+                  type="candlestick"
+                  height={320}
+                />
               </div>
             </div>
           </div>
+        </div>
 
-          <div style={{ marginTop: 12, padding: 12, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff" }}>
-            <h3 style={{ marginTop: 0 }}>OI by Expiry (stacked area)</h3>
-            <div style={{ width: "100%", height: 220 }}>
-              <ResponsiveContainer>
-                <AreaChart data={expiryAreaData}>
-                  <XAxis dataKey="expiry" tickFormatter={(v) => new Date(v).toLocaleDateString()} />
-                  <YAxis />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="CE_OI" stackId="1" name="CE OI" />
-                  <Area type="monotone" dataKey="PE_OI" stackId="1" name="PE OI" />
-                </AreaChart>
-              </ResponsiveContainer>
+        <div
+          style={{
+            marginTop: 18,
+            padding: 12,
+            border: "1px solid #e5e7eb",
+            borderRadius: 6,
+            background: "#fff",
+          }}
+        >
+          {/* show placeholder until indexOhlc is available */}
+          {indexOhlc ? (
+            <PivotPcrTables
+              indexOhlc={indexOhlc}
+              strikeAgg={strikeAgg}
+              atmStrike={atmStrike}
+              windowStats={stats}
+            />
+          ) : (
+            <div style={{ padding: 12, color: "#666" }}>
+              Loading pivot / PCR…
             </div>
-          </div>
+          )}
+        </div>
 
-          <div style={{ marginTop: 12, padding: 12, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff" }}>
-            <h3 style={{ marginTop: 0 }}>Underlying Candles</h3>
-            <div>
-              {/* optionally show the raw indexOhlc for debug */}
-              {/*<pre style={{fontSize:12}}>{indexOhlc ? JSON.stringify(indexOhlc, null, 2) : "indexOhlc: loading..."}</pre>*/}
-              <Chart options={candleOptions} series={candleSeries} type="candlestick" height={320} />
-            </div>
+        <div
+          style={{
+            marginTop: 18,
+            padding: 12,
+            border: "1px solid #e5e7eb",
+            borderRadius: 6,
+            background: "#fff",
+          }}
+        >
+          <h2>Strike Table</h2>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead style={{ background: "#f3f4f6" }}>
+                <tr>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE OI</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE OI Chng</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE Vol</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE IV</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE Theta</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE Delta</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE Gamma</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE LTP</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE LTP Chng</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE Bid Qty</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE Bid</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE Ask</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>CE Ask Qty</th>
+
+                  <th style={{ padding: 8, textAlign: "left" }}>Strike</th>
+
+                  <th style={{ padding: 8, textAlign: "left" }}>PE OI</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE OI Chng</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE Vol</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE IV</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE Theta</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE Delta</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE Gamma</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE LTP</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE LTP Chng</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE Bid Qty</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE Bid</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE Ask</th>
+                  <th style={{ padding: 8, textAlign: "left" }}>PE Ask Qty</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {strikeAgg.map((r) => {
+                  const isAtm = r.strike === atmStrike;
+                  const rowStyle = isAtm ? { background: "#fff7ed" } : {};
+                  return (
+                    <tr key={r.strike} style={rowStyle}>
+                      <td
+                        style={{
+                          padding: 8,
+                          background: heatColor(r.CE_OI, maxOI),
+                        }}
+                      >
+                        {fmt(r.CE_OI)}
+                      </td>
+                      <td
+                        style={{
+                          padding: 8,
+                          color:
+                            r.CE_OI_change > 0
+                              ? "green"
+                              : r.CE_OI_change < 0
+                              ? "red"
+                              : "inherit",
+                        }}
+                      >
+                        {fmt(r.CE_OI_change)}
+                      </td>
+                      <td style={{ padding: 8 }}>{fmt(r.CE_vol)}</td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.CE_iv ?? r.CE_impliedVol ?? null)}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.CE_theta ?? null)}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.CE_delta ?? null)}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.CE_gamma ?? null)}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.CE_last ?? null, 2)}
+                      </td>
+                      {/*<td style={{ padding: 8 }}>{safeNum(r.CE_ltp_chng ?? null,2)}</td>*/}
+                      <td
+                        style={{
+                          padding: 8,
+                          color:
+                            r.CE_ltp_chng > 0
+                              ? "green"
+                              : r.CE_ltp_chng < 0
+                              ? "red"
+                              : "inherit",
+                        }}
+                      >
+                        {safeNum(r.CE_ltp_chng ?? null, 2)}
+                      </td>
+                      <td style={{ padding: 8 }}>{fmt(r.CE_bidQty)}</td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.CE_bidPrice ?? null, 2)}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.CE_askPrice ?? null, 2)}
+                      </td>
+                      <td style={{ padding: 8 }}>{fmt(r.CE_askQty)}</td>
+
+                      <td style={{ padding: 8, background: "#fff7ed" }}>
+                        {r.strike}
+                      </td>
+
+                      <td
+                        style={{
+                          padding: 8,
+                          background: heatColor(r.PE_OI, maxOI),
+                        }}
+                      >
+                        {fmt(r.PE_OI)}
+                      </td>
+                      <td
+                        style={{
+                          padding: 8,
+                          color:
+                            r.PE_OI_change > 0
+                              ? "green"
+                              : r.PE_OI_change < 0
+                              ? "red"
+                              : "inherit",
+                        }}
+                      >
+                        {fmt(r.PE_OI_change)}
+                      </td>
+                      <td style={{ padding: 8 }}>{fmt(r.PE_vol)}</td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.PE_iv ?? r.PE_impliedVol ?? null)}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.PE_theta ?? null)}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.PE_delta ?? null)}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.PE_gamma ?? null)}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.PE_last ?? null, 2)}
+                      </td>
+                      {/*<td style={{ padding: 8 }}>{safeNum(r.PE_ltp_chng ?? null,2)}</td>*/}
+                      <td
+                        style={{
+                          padding: 8,
+                          color:
+                            r.PE_ltp_chng > 0
+                              ? "green"
+                              : r.PE_ltp_chng < 0
+                              ? "red"
+                              : "inherit",
+                        }}
+                      >
+                        {safeNum(r.PE_ltp_chng ?? null, 2)}
+                      </td>
+                      <td style={{ padding: 8 }}>{fmt(r.PE_bidQty)}</td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.PE_bidPrice ?? null, 2)}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {safeNum(r.PE_askPrice ?? null, 2)}
+                      </td>
+                      <td style={{ padding: 8 }}>{fmt(r.PE_askQty)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
 
-      <div style={{ marginTop: 18, padding: 12, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff" }}>
-        {/* show placeholder until indexOhlc is available */}
-        { indexOhlc ? (
-          <PivotPcrTables
-            indexOhlc={indexOhlc}
-            strikeAgg={strikeAgg}
-            atmStrike={atmStrike}
-            windowStats={stats}
-          />
-        ) : (
-          <div style={{ padding: 12, color: "#666" }}>Loading pivot / PCR…</div>
-        ) }
-      </div>
-
-      <div style={{ marginTop: 18, padding: 12, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff" }}>
-        <h2>Strike Table</h2>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead style={{ background: "#f3f4f6" }}>
-              <tr>
-                <th style={{ padding: 8, textAlign: "left" }}>CE OI</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE OI Chng</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE Vol</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE IV</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE Theta</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE Delta</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE Gamma</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE LTP</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE LTP Chng</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE Bid Qty</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE Bid</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE Ask</th>
-                <th style={{ padding: 8, textAlign: "left" }}>CE Ask Qty</th>
-
-                <th style={{ padding: 8, textAlign: "left" }}>Strike</th>
-
-                <th style={{ padding: 8, textAlign: "left" }}>PE OI</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE OI Chng</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE Vol</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE IV</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE Theta</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE Delta</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE Gamma</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE LTP</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE LTP Chng</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE Bid Qty</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE Bid</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE Ask</th>
-                <th style={{ padding: 8, textAlign: "left" }}>PE Ask Qty</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {strikeAgg.map((r) => {
-                const isAtm = r.strike === atmStrike;
-                const rowStyle = isAtm ? { background: "#fff7ed" } : {};
-                return (
-                  <tr key={r.strike} style={rowStyle}>
-                    <td style={{ padding: 8, background: heatColor(r.CE_OI, maxOI) }}>{fmt(r.CE_OI)}</td>
-                    <td style={{ padding: 8, color: (r.CE_OI_change>0) ? "green" : (r.CE_OI_change<0) ? "red" : "inherit"}}>
-                      {fmt(r.CE_OI_change)}
-                    </td>
-                    <td style={{ padding: 8 }}>{fmt(r.CE_vol)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.CE_iv ?? r.CE_impliedVol ?? null)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.CE_theta ?? null)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.CE_delta ?? null)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.CE_gamma ?? null)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.CE_last ?? null,2)}</td>
-                    {/*<td style={{ padding: 8 }}>{safeNum(r.CE_ltp_chng ?? null,2)}</td>*/}
-                    <td style={{ padding: 8, color: (r.CE_ltp_chng>0) ? "green" : (r.CE_ltp_chng<0) ? "red" : "inherit"}}>
-                      {safeNum(r.CE_ltp_chng ?? null,2)}
-                    </td>
-                    <td style={{ padding: 8 }}>{fmt(r.CE_bidQty)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.CE_bidPrice ?? null,2)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.CE_askPrice ?? null,2)}</td>
-                    <td style={{ padding: 8 }}>{fmt(r.CE_askQty)}</td>
-
-                    <td style={{ padding: 8, background: "#fff7ed" }}>{r.strike}</td>
-
-                    <td style={{ padding: 8, background: heatColor(r.PE_OI, maxOI) }}>{fmt(r.PE_OI)}</td>
-                    <td style={{ padding: 8, color: (r.PE_OI_change>0) ? "green" : (r.PE_OI_change<0) ? "red" : "inherit"}}>
-                      {fmt(r.PE_OI_change)}
-                    </td>
-                    <td style={{ padding: 8 }}>{fmt(r.PE_vol)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.PE_iv ?? r.PE_impliedVol ?? null)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.PE_theta ?? null)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.PE_delta ?? null)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.PE_gamma ?? null)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.PE_last ?? null,2)}</td>
-                    {/*<td style={{ padding: 8 }}>{safeNum(r.PE_ltp_chng ?? null,2)}</td>*/}
-                    <td style={{ padding: 8, color: (r.PE_ltp_chng>0) ? "green" : (r.PE_ltp_chng<0) ? "red" : "inherit"}}>
-                      {safeNum(r.PE_ltp_chng ?? null,2)}
-                    </td>
-                    <td style={{ padding: 8 }}>{fmt(r.PE_bidQty)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.PE_bidPrice ?? null,2)}</td>
-                    <td style={{ padding: 8 }}>{safeNum(r.PE_askPrice ?? null,2)}</td>
-                    <td style={{ padding: 8 }}>{fmt(r.PE_askQty)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div style={{ marginTop: 12, color: "#6b7280" }}>
+          Rows: {rows.length} • Filtered: {filtered.length}
+          {errorMsg && (
+            <div style={{ color: "crimson" }}>Error: {errorMsg}</div>
+          )}
         </div>
       </div>
-
-      <div style={{ marginTop: 12, color: "#6b7280" }}>
-        Rows: {rows.length} • Filtered: {filtered.length}
-        {errorMsg && <div style={{ color: "crimson" }}>Error: {errorMsg}</div>}
-      </div>
-    </div>
     </div>
   );
 }

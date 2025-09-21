@@ -1,10 +1,10 @@
 # app_api.py
-import pandas as pd, os, json, requests
+import pandas as pd, os, json, requests, sys
 from flask import jsonify, request, current_app as app
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from backend.fetcher import fetch_nse_json, normalize_nse_json
-from backend.analytics import compute_vwap, compute_pcr, compute_max_pain, compute_skew, compute_window_bounds_from_spot
+from backend.analytics import compute_vwap, compute_pcr, compute_max_pain, compute_skew, compute_window_bounds_from_spot, compute_pcr_change
 from backend.candles import append_snapshot, build_candles_from_snapshots
 from datetime import datetime
 
@@ -23,77 +23,129 @@ def optionchain():
 
 @app.route("/api/nifty/window_stats")
 def window_stats():
-    mode = request.args.get('mode','FIXED')
-    atm_window = int(request.args.get('atm_window', 3))
+    mode = request.args.get("mode", "FIXED")
+    atm_window = int(request.args.get("atm_window", 3))
     try:
         j = fetch_nse_json()
         df = normalize_nse_json(j)
 
         # compute spot/atm/window bounds
-        spot = float(df['underlyingPrice'].median()) if (df is not None and not df.empty) else None
-        atm, low, high = compute_window_bounds_from_spot(spot, fixed=(mode == 'FIXED'), atm_window_strikes=atm_window)
+        spot = float(df["underlyingPrice"].median()) if (df is not None and not df.empty) else None
+        atm, low, high = compute_window_bounds_from_spot(
+            spot, fixed=(mode == "FIXED"), atm_window_strikes=atm_window
+        )
 
         # build window_df safely (if low/high None -> full df)
         if low is None or high is None:
             window_df = df.copy() if (df is not None) else pd.DataFrame()
         else:
-            window_df = df[(df['strike'] >= low) & (df['strike'] <= high)].copy()
+            window_df = df[(df["strike"] >= low) & (df["strike"] <= high)].copy()
 
-        # compute pcr_window with per-strike exclusion so it matches frontend behavior
+        # headline PCR (global sums across window)
         try:
-            pcr_window = compute_pcr(window_df, mode='OI', exclude_zero=True, strike_min=low, strike_max=high)
+            pcr_window = compute_pcr(window_df, mode="OI")
         except Exception:
             app.logger.exception("compute_pcr(window) failed")
             pcr_window = None
 
-        # compute detailed CE/PE totals for the same window (for verification/debug)
-        def _compute_window_totals(df_window):
-            if df_window is None or df_window.empty:
-                return {"CE_OI": 0, "PE_OI": 0, "CE_vol": 0, "PE_vol": 0}
-            pivot_oi = df_window.pivot_table(index='strike', columns='optionType', values='OI', aggfunc='sum').fillna(0)
-            pivot_vol = df_window.pivot_table(index='strike', columns='optionType', values='volume', aggfunc='sum').fillna(0)
-            if 'CE' not in pivot_oi.columns:
-                pivot_oi['CE'] = 0
-            if 'PE' not in pivot_oi.columns:
-                pivot_oi['PE'] = 0
-            if 'CE' not in pivot_vol.columns:
-                pivot_vol['CE'] = 0
-            if 'PE' not in pivot_vol.columns:
-                pivot_vol['PE'] = 0
+        # bucketed PCR (mirrors frontend grouping)
+        def compute_pcr_buckets(window_df, atm):
+            def make_bucket():
+                return {"CE_OI": 0, "PE_OI": 0, "CE_vol": 0, "PE_vol": 0, "CE_strikes": [], "PE_strikes": []}
 
-            # apply same exclusion rule used by compute_pcr(exclude_zero=True): keep strikes where both CE>0 and PE>0
-            keep = (pivot_oi['CE'] > 0) & (pivot_oi['PE'] > 0)
-            pivot_oi_kept = pivot_oi[keep]
-            pivot_vol_kept = pivot_vol[keep]
+            buckets = {"ATM": make_bucket(), "ITM": make_bucket(), "OTM": make_bucket(), "TOTAL": make_bucket()}
+            if window_df is None or window_df.empty:
+                return {k: make_bucket() for k in buckets}
 
-            ce_oi_total = int(pivot_oi_kept['CE'].sum())
-            pe_oi_total = int(pivot_oi_kept['PE'].sum())
-            ce_vol_total = int(pivot_vol_kept['CE'].sum())
-            pe_vol_total = int(pivot_vol_kept['PE'].sum())
+            for _, row in window_df.iterrows():
+                st = float(row["strike"])
+                opt = row.get("optionType")
+                oi = int(row.get("OI", 0) or 0)
+                vol = int(row.get("volume", 0) or 0)
 
+                if opt == "CE":
+                    buckets["TOTAL"]["CE_OI"] += oi
+                    buckets["TOTAL"]["CE_vol"] += vol
+                    buckets["TOTAL"]["CE_strikes"].append(st)
+                else:
+                    buckets["TOTAL"]["PE_OI"] += oi
+                    buckets["TOTAL"]["PE_vol"] += vol
+                    buckets["TOTAL"]["PE_strikes"].append(st)
+
+                if atm is not None and st == atm:
+                    if opt == "CE":
+                        buckets["ATM"]["CE_OI"] += oi
+                        buckets["ATM"]["CE_vol"] += vol
+                        buckets["ATM"]["CE_strikes"].append(st)
+                    else:
+                        buckets["ATM"]["PE_OI"] += oi
+                        buckets["ATM"]["PE_vol"] += vol
+                        buckets["ATM"]["PE_strikes"].append(st)
+                elif atm is not None and st < atm:
+                    if opt == "CE":
+                        buckets["ITM"]["CE_OI"] += oi
+                        buckets["ITM"]["CE_vol"] += vol
+                        buckets["ITM"]["CE_strikes"].append(st)
+                    else:
+                        buckets["OTM"]["PE_OI"] += oi
+                        buckets["OTM"]["PE_vol"] += vol
+                        buckets["OTM"]["PE_strikes"].append(st)
+                elif atm is not None and st > atm:
+                    if opt == "PE":
+                        buckets["ITM"]["PE_OI"] += oi
+                        buckets["ITM"]["PE_vol"] += vol
+                        buckets["ITM"]["PE_strikes"].append(st)
+                    else:
+                        buckets["OTM"]["CE_OI"] += oi
+                        buckets["OTM"]["CE_vol"] += vol
+                        buckets["OTM"]["CE_strikes"].append(st)
+
+            def finalize(obj):
+                ce, pe, ceVol, peVol = obj["CE_OI"], obj["PE_OI"], obj["CE_vol"], obj["PE_vol"]
+                ceRange = f"{int(min(obj['CE_strikes']))} — {int(max(obj['CE_strikes']))}" if obj["CE_strikes"] else "—"
+                peRange = f"{int(min(obj['PE_strikes']))} — {int(max(obj['PE_strikes']))}" if obj["PE_strikes"] else "—"
+                pcr = (pe / ce) if ce > 0 else None
+                return dict(
+                    CE_OI=ce, PE_OI=pe, CE_vol=ceVol, PE_vol=peVol,
+                    CE_range=ceRange, PE_range=peRange, PCR=pcr
+                )
+
+            return {k: finalize(v) for k, v in buckets.items()}
+
+        pcr_buckets = compute_pcr_buckets(window_df, atm)
+
+        def _serialize_bucket(b):
             return {
-                "CE_OI": ce_oi_total,
-                "PE_OI": pe_oi_total,
-                "CE_vol": ce_vol_total,
-                "PE_vol": pe_vol_total
+                "CE_OI": int(b.get("CE_OI", 0) or 0),
+                "PE_OI": int(b.get("PE_OI", 0) or 0),
+                "CE_vol": int(b.get("CE_vol", 0) or 0),
+                "PE_vol": int(b.get("PE_vol", 0) or 0),
+                "CE_range": b.get("CE_range", "—"),
+                "PE_range": b.get("PE_range", "—"),
+                "PCR": float(b["PCR"]) if (b.get("PCR") is not None) else None,
             }
 
-        pcr_window_details = _compute_window_totals(window_df)
+        pcr_buckets_serial = {k: _serialize_bucket(v) for k, v in pcr_buckets.items()}
 
-        # compute overall PCR as before (legacy/global-sum)
-        try:
-            pcr_overall = compute_pcr(df, mode='OI', exclude_zero=False)
-        except Exception:
-            app.logger.exception("compute_pcr(overall) failed")
-            pcr_overall = None
+        # pcr_window_details = both global and bucket totals
+        global_ce = int(window_df.loc[window_df["optionType"] == "CE", "OI"].sum()) if not window_df.empty else 0
+        global_pe = int(window_df.loc[window_df["optionType"] == "PE", "OI"].sum()) if not window_df.empty else 0
 
-        # VWAP, Max Pain, Skew, Prev Close & avg_val calculation (unchanged)
+        pcr_window_details = {
+            "global_CE_OI": global_ce,
+            "global_PE_OI": global_pe,
+            "bucket_TOTAL_CE_OI": pcr_buckets_serial["TOTAL"]["CE_OI"],
+            "bucket_TOTAL_PE_OI": pcr_buckets_serial["TOTAL"]["PE_OI"],
+        }
+
+        # other stats
+        pcr_overall = compute_pcr(df, mode="OI") if not df.empty else None
         vwap = compute_vwap(window_df)
         mp = compute_max_pain(window_df)
         skew = compute_skew(window_df)
-        prev_close = float(df['underlyingPrice'].iloc[0]) if (df is not None and not df.empty) else None
+        prev_close = float(df["underlyingPrice"].iloc[0]) if not df.empty else None
 
-        # compute Avg (H-L, H-Pc, Pc-L) using latest candles/fallback
+        # avg_val from candles (fallback)
         avg_val = None
         try:
             import json, os
@@ -103,32 +155,59 @@ def window_stats():
                     candles = json.load(fh)
                     if candles:
                         last = candles[-1]
-                        H = last.get('high')
-                        L = last.get('low')
+                        H, L = last.get("high"), last.get("low")
                         if prev_close is not None and H is not None and L is not None:
                             avg_val = max(H - L, abs(H - prev_close), abs(L - prev_close))
         except Exception:
             avg_val = None
 
-        snap = {'ts': datetime.utcnow().isoformat(), 'underlyingPrice': spot, 'volume_sum': int(df['volume'].sum()) if (df is not None and not df.empty) else 0}
+        snap = {
+            "ts": datetime.utcnow().isoformat(),
+            "underlyingPrice": spot,
+            "volume_sum": int(df["volume"].sum()) if not df.empty else 0,
+        }
+        
+        # compute window PCR (legacy) as before
+        pcr_window = compute_pcr(window_df, mode='OI')
+
+        # compute pcr change using the new helper
+        try:
+            pcr_window_ch, pcr_window_pe_ch, pcr_window_ce_ch = compute_pcr_change(window_df)
+        except Exception:
+            app.logger.exception("compute_pcr_change(window) failed")
+            pcr_window_ch, pcr_window_pe_ch, pcr_window_ce_ch = None, 0, 0
+
+        
         try:
             append_snapshot(snap)
             build_candles_from_snapshots()
         except Exception:
             app.logger.exception("snapshot append failed")
 
-        # return JSON including pcr_window_details for verification
+        # include these in the returned JSON
         return jsonify({
             'atm': atm, 'low': low, 'high': high,
-            'pcr_window': pcr_window, 'pcr_window_details': pcr_window_details, 'pcr_overall': pcr_overall,
-            'vwap': vwap, 'max_pain': mp, 'skew': skew, 'prev_close': prev_close,
-            'avg_val': avg_val
+            'pcr_window': pcr_window,
+            "pcr_window_details": pcr_window_details,
+            "pcr_buckets": pcr_buckets_serial,
+            'pcr_window_ch': pcr_window_ch,
+            'pcr_window_ch_details': {'PE_change': pcr_window_pe_ch, 'CE_change': pcr_window_ce_ch},
+            'pcr_overall': pcr_overall,
+            'vwap': vwap, 'max_pain': mp, 'skew': skew,
+            'prev_close': prev_close, 'avg_val': avg_val
         })
 
     except Exception as e:
         app.logger.exception("window_stats failed")
-        safe = {'atm': None, 'low': None, 'high': None, 'pcr_window': None, 'pcr_window_details': {"CE_OI":0,"PE_OI":0,"CE_vol":0,"PE_vol":0}, 'pcr_overall': None, 'vwap': {}, 'max_pain': None, 'skew': None, 'prev_close': None, 'avg_val': None, 'error': str(e)}
-        return jsonify(safe), 200
+        safe = {
+            "atm": None, "low": None, "high": None,
+            "pcr_window": None, "pcr_window_details": {}, "pcr_buckets": {},
+            "pcr_overall": None, "vwap": {}, "max_pain": None,
+            "skew": None, "prev_close": None, "avg_val": None,
+            "error": str(e),
+        }
+    return jsonify(safe), 200
+
 
 @app.route("/api/nifty/candles")
 def get_candles():
