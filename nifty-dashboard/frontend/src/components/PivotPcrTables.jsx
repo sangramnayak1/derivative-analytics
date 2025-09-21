@@ -1,0 +1,381 @@
+import React, { useMemo } from "react";
+
+/**
+ * PivotPcrTables
+ *
+ * Props:
+ *  - indexOhlc: object { open, high, low, last, prev_close, avg_val, ... }
+ *  - strikeAgg: array of strike aggregated rows (must contain: strike, CE_OI, PE_OI)
+ *  - atmStrike: number (ATM strike)
+ *  - windowStats: optional object returned from /api/nifty/window_stats (contains max_pain etc.)
+ *
+ * Usage:
+ *  <PivotPcrTables indexOhlc={indexOhlc} strikeAgg={strikeAgg} atmStrike={atm} windowStats={windowStats} />
+ */
+export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, strikeAgg = [], atmStrike = null, windowStats = {} }) {
+    // ---- helpers ----
+    const fmtNum = (v, dp = 0) => {
+        if (v === null || v === undefined || Number.isNaN(v)) return "—";
+        const n = Number(v);
+        if (!Number.isFinite(n)) return "—";
+        if (Math.abs(n) >= 100000) return (n / 100000).toFixed(dp) + "L";
+        if (Math.abs(n) >= 1000) return (n / 1000).toFixed(dp) + "k";
+        return dp ? n.toFixed(dp) : n.toString();
+    };
+    const fmtFixed = (v, dp = 2) => (v == null ? "—" : Number(v).toFixed(dp));
+
+    // ---- pivot calculations (classic pivot) ----
+    // ---- pivot calculations (classic pivot) ----
+    // use prevIndexOhlc if provided, otherwise fallback to indexOhlc
+    const pivotData = useMemo(() => {
+        const source = prevIndexOhlc ?? indexOhlc; // prefer previous day OHLC when passed
+        if (!source) return null;
+
+        const hRaw = source?.high ?? source?.h ?? source?.highPrice;
+        const lRaw = source?.low ?? source?.l ?? source?.lowPrice;
+        const cRaw = source?.last ?? source?.close ?? source?.previousClose ?? source?.prev_close ?? source?.open;
+
+        const h = Number(hRaw);
+        const l = Number(lRaw);
+        const c = Number(cRaw);
+
+        if (![h, l, c].every(v => Number.isFinite(v))) {
+            // Not enough data yet
+            return null;
+        }
+
+        const P = (h + l + c) / 3.0;
+        const R1 = (2 * P) - l;
+        const S1 = (2 * P) - h;
+        const R2 = P + (h - l);
+        const S2 = P - (h - l);
+        const R3 = h + 2 * (P - l);
+        const S3 = l - 2 * (h - P);
+
+        // indexVal (for pivot difference) should use current index value if available from indexOhlc,
+        // otherwise use the same source (prevIndexOhlc) so PD shows something reasonable.
+        const indexVal = Number(indexOhlc?.last ?? indexOhlc?.close ?? indexOhlc?.prev_close ?? source?.last ?? NaN);
+        const pd = (level) => (Number.isFinite(indexVal) ? (indexVal - level) : null);
+
+        // NEW: gap = distance from CP (pivot) to each level (positive numbers)
+        const gap = {
+            S3: S3 - P,
+            S2: S2 - P,
+            S1: S1 - P,
+            CP: 0,
+            R1: R1 - P,
+            R2: R2 - P,
+            R3: R3 - P
+        };
+
+        return {
+            P, R1, R2, R3, S1, S2, S3,
+            indexVal,
+            gap,                        // <-- added
+            pivotDiff: {
+                S3: pd(S3), S2: pd(S2), S1: pd(S1), CP: pd(P), R1: pd(R1), R2: pd(R2), R3: pd(R3)
+            }
+        };
+    }, [indexOhlc, prevIndexOhlc]);
+
+
+    // ---- PCR breakdown (OTM / ATM / ITM / TOTAL / Max Pain) ----
+    const pcrData = useMemo(() => {
+        if (!Array.isArray(strikeAgg)) return null;
+
+        const atm = Number(atmStrike);
+        if (!Number.isFinite(atm)) return null;
+
+        const makeBucket = () => ({
+            CE_OI: 0, PE_OI: 0,
+            CE_vol: 0, PE_vol: 0,
+            CE_strikes: [], PE_strikes: [] // arrays of strike values that contributed
+        });
+
+        const buckets = {
+            ATM: makeBucket(),
+            ITM: makeBucket(),
+            OTM: makeBucket(),
+            TOTAL: makeBucket()
+        };
+
+        for (const srow of strikeAgg) {
+            const st = Number(srow.strike);
+            if (!Number.isFinite(st)) continue;
+
+            const ceOI = Number(srow.CE_OI || 0);
+            const peOI = Number(srow.PE_OI || 0);
+            const ceVol = Number(srow.CE_vol || 0);
+            const peVol = Number(srow.PE_vol || 0);
+
+            // always to total
+            buckets.TOTAL.CE_OI += ceOI;
+            buckets.TOTAL.PE_OI += peOI;
+            buckets.TOTAL.CE_vol += ceVol;
+            buckets.TOTAL.PE_vol += peVol;
+            if (ceOI > 0) buckets.TOTAL.CE_strikes.push(st);
+            if (peOI > 0) buckets.TOTAL.PE_strikes.push(st);
+
+            if (st === atm) {
+                buckets.ATM.CE_OI += ceOI;
+                buckets.ATM.PE_OI += peOI;
+                buckets.ATM.CE_vol += ceVol;
+                buckets.ATM.PE_vol += peVol;
+                if (ceOI > 0) buckets.ATM.CE_strikes.push(st);
+                if (peOI > 0) buckets.ATM.PE_strikes.push(st);
+            } else if (st < atm) {
+                // lower strikes: CE ITM, PE OTM
+                buckets.ITM.CE_OI += ceOI;
+                buckets.ITM.CE_vol += ceVol;
+                if (ceOI > 0) buckets.ITM.CE_strikes.push(st);
+
+                buckets.OTM.PE_OI += peOI;
+                buckets.OTM.PE_vol += peVol;
+                if (peOI > 0) buckets.OTM.PE_strikes.push(st);
+            } else { // st > atm
+                // higher strikes: PE ITM, CE OTM
+                buckets.ITM.PE_OI += peOI;
+                buckets.ITM.PE_vol += peVol;
+                if (peOI > 0) buckets.ITM.PE_strikes.push(st);
+
+                buckets.OTM.CE_OI += ceOI;
+                buckets.OTM.CE_vol += ceVol;
+                if (ceOI > 0) buckets.OTM.CE_strikes.push(st);
+            }
+        }
+
+        const finalize = (obj) => {
+            const ce = obj.CE_OI || 0;
+            const pe = obj.PE_OI || 0;
+            const ceVol = obj.CE_vol || 0;
+            const peVol = obj.PE_vol || 0;
+
+            const ceRange = (obj.CE_strikes && obj.CE_strikes.length)
+                ? `${Math.min(...obj.CE_strikes)} — ${Math.max(...obj.CE_strikes)}`
+                : "—";
+            const peRange = (obj.PE_strikes && obj.PE_strikes.length)
+                ? `${Math.min(...obj.PE_strikes)} — ${Math.max(...obj.PE_strikes)}`
+                : "—";
+
+            return {
+                CE_OI: ce,
+                PE_OI: pe,
+                CE_vol: ceVol,
+                PE_vol: peVol,
+                CE_range: ceRange,
+                PE_range: peRange,
+                PCR: ce ? (pe / ce) : (pe ? Infinity : null)
+            };
+        };
+
+        const ATM = finalize(buckets.ATM);
+        const ITM = finalize(buckets.ITM);
+        const OTM = finalize(buckets.OTM);
+        const TOTAL = finalize(buckets.TOTAL);
+
+        // Max pain selection (prefer windowStats if available)
+        let maxPain = null;
+        if (windowStats && windowStats.max_pain && windowStats.max_pain.max_pain_strike) {
+            maxPain = windowStats.max_pain.max_pain_strike;
+        } else if (windowStats && windowStats.max_pain && windowStats.max_pain.pain_map) {
+        const pm = windowStats.max_pain.pain_map;
+        let minVal = Number.POSITIVE_INFINITY, minStrike = null;
+        for (const k of Object.keys(pm)) {
+            const v = Number(pm[k]);
+            if (Number.isFinite(v) && v < minVal) { minVal = v; minStrike = Number(k); }
+        }
+        maxPain = minStrike;
+        } else {
+        // fallback: pick strike with max total OI
+        let best = null, bestVal = -1;
+        for (const r of strikeAgg) {
+            const total = (Number(r.CE_OI || 0) + Number(r.PE_OI || 0));
+            if (total > bestVal) { bestVal = total; best = r.strike; }
+        }
+        maxPain = best;
+        }
+
+        return { ATM, ITM, OTM, TOTAL, maxPain };
+    }, [strikeAgg, atmStrike, windowStats]);
+
+
+  // ---- render ----
+  return (
+    <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+        {/* Pivot Table card */}
+        <div style={{
+            flex: "1 1 360px",
+            border: "1px solid #eee",
+            borderRadius: 8,
+            padding: 12,
+            background: "#fff"
+        }}>
+            <h3 style={{ marginTop: 0 }}>Support - Resistance Table</h3>
+            {pivotData ? (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                <tr>
+                    <th style={{ textAlign: "left", padding: 6 }}>Zone</th>
+                    <th style={{ textAlign: "left", padding: 6 }}>Index</th>
+                    <th style={{ textAlign: "left", padding: 6 }}>Pivot Gap (Index − CP)</th>
+                    <th style={{ textAlign: "left", padding: 6 }}>Pivot Difference (Last - Index)</th>
+                </tr>
+                </thead>
+                <tbody>
+                    {["S3","S2","S1","CP","R1","R2","R3"].map((z) => {
+                        const level = pivotData[z === "CP" ? "P" : z];
+                        const gap = pivotData?.gap?.[z];
+                        const pd = pivotData?.pivotDiff?.[z];
+
+                        // highlight CP row
+                        const rowStyle = z === "CP"
+                        ? { background: "#fff7ed", fontWeight: 600 } // light orange, bold
+                        : {};
+
+                        return (
+                        <tr key={z} style={rowStyle}>
+                            <td style={{ padding: 8, fontWeight: 600 }}>{z}</td>
+                            <td style={{ padding: 8 }}>{ level == null ? "—" : fmtFixed(level, 2) }</td>
+                            <td style={{ padding: 8 }}>{ gap == null ? "—" : fmtNum(gap, 2) }</td>
+                            <td style={{ padding: 8 }}>{ pd == null ? "—" : fmtNum(pd, 2) }</td>
+                        </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+            ) : (
+                <div style={{ color: "#666" }}>Index OHLC required for pivot calculation</div>
+            )}
+        </div>
+
+
+        {/* PCR Table card */}
+        <div style={{
+            flex: "1 1 420px",
+            border: "1px solid #eee",
+            borderRadius: 8,
+            padding: 12,
+            background: "#fff"
+            }}>
+            <h3 style={{ marginTop: 0 }}>PCR Table</h3>
+
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                <tr>
+                    <th style={{ textAlign: "left", padding: 6 }}>RANGE</th>
+                    <th style={{ textAlign: "left", padding: 6 }}>CE Range</th>   {/* new */}
+                    <th style={{ textAlign: "left", padding: 6 }}>PE Range</th>   {/* new */}
+                    <th style={{ textAlign: "right", padding: 6 }}>CE OI</th>
+                    <th style={{ textAlign: "right", padding: 6 }}>PE OI</th>
+                    <th style={{ textAlign: "right", padding: 6 }}>CE Vol</th>   {/* new */}
+                    <th style={{ textAlign: "right", padding: 6 }}>PE Vol</th>   {/* new */}
+                    <th style={{ textAlign: "right", padding: 6 }}>PCR</th>
+                </tr>
+                </thead>
+                <tbody>
+                {pcrData ? (
+                    <>
+                    <tr>
+                        <td style={{ padding: 8 }}>OTM</td>
+                        <td style={{ padding: 8 }}>{pcrData.OTM.CE_range}</td>
+                        <td style={{ padding: 8 }}>{pcrData.OTM.PE_range}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.OTM.CE_OI)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.OTM.PE_OI)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.OTM.CE_vol)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.OTM.PE_vol)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.OTM.PCR == null ? "—" : Number(pcrData.OTM.PCR).toFixed(3)}</td>
+                        { /* ensure numeric CE/PE OI used for PCR so UI always matches */ }
+                        {/*{ (() => {
+                            const ce = Number(pcrData.OTM.CE_OI || 0);
+                            const pe = Number(pcrData.OTM.PE_OI || 0);
+                            const pcr = ce === 0 ? (pe ? Infinity : null) : (pe / ce);
+                            return (
+                                <td style={{ padding: 8, textAlign: "right" }}>
+                                    {pcr == null ? "—" : Number(pcr).toFixed(3)}
+                                </td>
+                            );
+                        })() }*/}
+                    </tr>
+
+                    <tr>
+                        <td style={{ padding: 8 }}>ATM</td>
+                        <td style={{ padding: 8 }}>{pcrData.ATM.CE_range}</td>
+                        <td style={{ padding: 8 }}>{pcrData.ATM.PE_range}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ATM.CE_OI)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ATM.PE_OI)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ATM.CE_vol)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ATM.PE_vol)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ATM.PCR == null ? "—" : Number(pcrData.ATM.PCR).toFixed(3)}</td>
+                        { /* ensure numeric CE/PE OI used for PCR so UI always matches */ }
+                        {/*{ (() => {
+                            const ce = Number(pcrData.ATM.CE_OI || 0);
+                            const pe = Number(pcrData.ATM.PE_OI || 0);
+                            const pcr = ce === 0 ? (pe ? Infinity : null) : (pe / ce);
+                            return (
+                                <td style={{ padding: 8, textAlign: "right" }}>
+                                    {pcr == null ? "—" : Number(pcr).toFixed(3)}
+                                </td>
+                            );
+                        })() }*/}
+                    </tr>
+
+                    <tr>
+                        <td style={{ padding: 8 }}>ITM</td>
+                        <td style={{ padding: 8 }}>{pcrData.ITM.CE_range}</td>
+                        <td style={{ padding: 8 }}>{pcrData.ITM.PE_range}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ITM.CE_OI)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ITM.PE_OI)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ITM.CE_vol)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{fmtNum(pcrData.ITM.PE_vol)}</td>
+                        <td style={{ padding: 8, textAlign: "right" }}>{pcrData.ITM.PCR == null ? "—" : Number(pcrData.ITM.PCR).toFixed(3)}</td>
+                        { /* ensure numeric CE/PE OI used for PCR so UI always matches */ }
+                        {/*{ (() => {
+                            const ce = Number(pcrData.ITM.CE_OI || 0);
+                            const pe = Number(pcrData.ITM.PE_OI || 0);
+                            const pcr = ce === 0 ? (pe ? Infinity : null) : (pe / ce);
+                            return (
+                                <td style={{ padding: 8, textAlign: "right" }}>
+                                    {pcr == null ? "—" : Number(pcr).toFixed(3)}
+                                </td>
+                            );
+                        })() }*/}
+
+                    </tr>
+
+                    <tr style={{ borderTop: "1px dashed #ddd" }}>
+                        <td style={{ padding: 8, fontWeight: 700 }}>TOTAL</td>
+                        <td style={{ padding: 8 }}></td>
+                        <td style={{ padding: 8 }}></td>
+                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{fmtNum(pcrData.TOTAL.CE_OI)}</td>
+                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{fmtNum(pcrData.TOTAL.PE_OI)}</td>
+                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{fmtNum(pcrData.TOTAL.CE_vol)}</td>
+                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{fmtNum(pcrData.TOTAL.PE_vol)}</td>
+                        {/*<td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>
+                        { (windowStats?.pcr_window ?? pcrData.TOTAL.PCR) == null
+                            ? "—"
+                            : Number(windowStats?.pcr_window ?? pcrData.TOTAL.PCR).toFixed(3)
+                        }
+                        </td>*/}
+                        <td style={{ padding: 8, textAlign: "right", fontWeight: 700 }}>{pcrData.TOTAL.PCR == null ? "—" : Number(pcrData.TOTAL.PCR).toFixed(3)}</td>
+                    </tr>
+
+                    <tr>
+                        <td style={{ padding: 8 }}>Max Pain</td>
+                        <td style={{ padding: 8 }}>{pcrData.maxPain ?? "—"}</td>
+                        <td style={{ padding: 8 }}></td>
+                        <td style={{ padding: 8 }}></td>
+                        <td style={{ padding: 8 }}></td>
+                        <td style={{ padding: 8 }}></td>
+                        <td style={{ padding: 8 }}></td>
+                        <td style={{ padding: 8 }}></td>
+                    </tr>
+                    </>
+                ) : (
+                    <tr><td colSpan={8} style={{ padding: 8 }}>Strike data required</td></tr>
+                )}
+                </tbody>
+            </table>
+        </div>
+    </div>
+  );
+}
