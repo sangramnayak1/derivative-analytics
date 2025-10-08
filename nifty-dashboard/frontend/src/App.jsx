@@ -19,13 +19,17 @@ import Chart from "react-apexcharts";
 import { DownloadCloud } from "lucide-react";
 import PivotPcrTables from "./components/PivotPcrTables";
 
-// Example prevIndexOhlc object (you should fill these with previous day's real values)
-const prevIndexOhlc = {
-  high: 25428.75,
-  low: 25286.3,
-  last: 25327.05,        // or previousClose
-  previousClose: 25327.05
-};
+
+  // Example prevIndexOhlc object (you should fill these with previous day's real values)
+  /*
+  const prevIndexOhlc = {
+    open:	25209,
+    high:	25261.9,
+    low:	25084.65,
+    close:	25169.5,
+    previousClose:	25202.35	
+  };
+  */
 
 const POLL_OPTIONS = [
   { label: "Manual", value: 0 },
@@ -36,6 +40,7 @@ const POLL_OPTIONS = [
 
 const safeNum = (val, digits = 3) =>
   val != null && isFinite(val) ? Number(val).toFixed(digits) : "—";
+
 const fmt = (n) => {
   if (n == null) return "—";
   const abs = Math.abs(n);
@@ -97,6 +102,251 @@ export default function App() {
   const [excludeZeroSide, setExcludeZeroSide] = useState(true);
 
   const [suggestion, setSuggestion] = useState(null);
+
+  // Replacement for prevIndexOhlc
+  // ------------------- REPLACEMENT START -------------------
+  // Remove your old `const dataMap = useState(new Map(Object.entries(map)));`
+  // and the old `function createMap() { ... }` and the old prevIndexOhlc.
+  // Replace them with the hook below and the prevIndexOhlc built from it.
+
+  /**
+   * Custom hook: useKeyValueMap(url)
+   * - Fetches a small two-line tab-separated text file from `url`.
+   * - First line = keys, second line = values.
+   * - Removes commas from numeric values.
+   * - Normalizes keys into camelCase (e.g. "Prev Close" -> "prevClose").
+   * - Returns:
+   *    - mapObj: plain object with normalized keys
+   *    - dataMap: a JS Map built from mapObj (so you can call .get())
+   *    - allValues: array of values (in key order)
+   *    - loading, error: status flags
+   */
+  /**
+ * Normalize a header string into safe camelCase key.
+ * Examples:
+ *  "Previous Close"  -> "previousClose"
+ *  "Prev Close"      -> "prevClose"
+ *  "previous_close"  -> "previousClose"
+ *  "Previous–Close"  -> "previousClose"
+ */
+  function normalizeKey(s) {
+    if (!s && s !== 0) return "";
+
+    // 1) Ensure string and normalize unicode (NFKC)
+    let str = String(s).normalize("NFKC");
+
+    // 2) Replace NBSP and control chars with normal space
+    str = str.replace(/\u00A0/g, " ").replace(/[\t\r\n]+/g, " ");
+
+    // 3) Replace common separators with space (dash, underscore, dot, slash)
+    str = str.replace(/[-_./–—]+/g, " ");
+
+    // 4) Collapse multiple spaces and trim
+    str = str.replace(/\s+/g, " ").trim();
+    if (!str) return "";
+
+    // 5) Split words and form camelCase: first word lowercase, rest capitalized
+    const parts = str.split(" ").filter(Boolean);
+    const first = parts[0].toLowerCase();
+    const rest = parts
+      .slice(1)
+      .map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+      .join("");
+
+    // 6) Remove any remaining characters that are not letters/numbers/underscore
+    const camel = (first + rest).replace(/[^\p{L}\p{N}_]/gu, "");
+    return camel || "";
+  }
+
+  /**
+   * Custom hook: fetch a 2-line key/value text file and return parsed map
+   * - url: path to file (e.g. "/data/prev_data.txt")
+   * Behavior:
+   * - tolerant splitting (tabs or spaces)
+   * - auto-merge adjacent header tokens until header-count == value-count
+   * - normalize merged headers with normalizeKey()
+   * - remove commas from numeric values
+   */
+  function useKeyValueMap(url) {
+    const [mapObj, setMapObj] = useState({});
+    const [allValues, setAllValues] = useState([]);
+    const [loadingMap, setLoadingMap] = useState(true);
+    const [mapError, setMapError] = useState(null);
+
+    useEffect(() => {
+      let mounted = true;
+      setLoadingMap(true);
+      setMapError(null);
+
+      fetch(url)
+        .then((res) => {
+          if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
+          return res.text();
+        })
+        .then((text) => {
+          if (!mounted) return;
+
+          // split into non-empty lines (handles CRLF)
+          const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+          if (lines.length < 2) {
+            setMapObj({});
+            setAllValues([]);
+            setLoadingMap(false);
+            return;
+          }
+
+          // tolerant tokenization: split on any whitespace (tabs/spaces)
+          let rawKeys = lines[0].trim().split(/\s+/).map(k => k.trim()).filter(Boolean);
+          const rawValues = lines[1].trim().split(/\s+/).map(v => v.trim()).filter(Boolean);
+
+          // If more key tokens than values, auto-merge adjacent key tokens left->right
+          // until the counts match (handles "previous close" split into ["previous","close"])
+          if (rawKeys.length > rawValues.length) {
+            rawKeys = rawKeys.slice(); // copy
+            let i = 0;
+            while (rawKeys.length > rawValues.length && rawKeys.length > 1) {
+              // merge token i and i+1
+              rawKeys[i] = (rawKeys[i] + " " + rawKeys[i + 1]).trim();
+              rawKeys.splice(i + 1, 1); // remove merged token
+              // advance i to avoid merging same pair repeatedly; wrap-around
+              i = (i + 1) % Math.max(1, rawKeys.length);
+            }
+          }
+
+          // If still mismatch, log for debugging (will proceed best-effort)
+          if (rawKeys.length !== rawValues.length) {
+            console.warn("useKeyValueMap: header/value length mismatch after auto-merge:", rawKeys.length, rawValues.length);
+            console.log("rawKeys:", rawKeys);
+            console.log("rawValues:", rawValues);
+          }
+
+          // Build normalized object: normalize keys and strip commas from values
+          const obj = {};
+          for (let i = 0; i < rawKeys.length; i++) {
+            const rawKey = rawKeys[i];
+            const rawVal = rawValues[i] ?? "";
+            const norm = normalizeKey(rawKey);
+            obj[norm] = ("" + rawVal).replace(/,/g, ""); // keep value as string, commas removed
+          }
+
+          // Debug logs to confirm parse (remove in production)
+          console.log("useKeyValueMap -> normalized keys:", Object.keys(obj));
+          console.log("useKeyValueMap -> mapObj preview:", obj);
+
+          setMapObj(obj);
+          setAllValues(Object.values(obj));
+          setLoadingMap(false);
+        })
+        .catch((err) => {
+          if (!mounted) return;
+          setMapError(err);
+          setLoadingMap(false);
+        });
+
+      return () => { mounted = false; };
+    }, [url]);
+
+    const dataMap = useMemo(() => new Map(Object.entries(mapObj)), [mapObj]);
+
+    // Helpful debug (remove in production)
+    console.log("mapObj keys:", Object.keys(mapObj));
+    console.log("mapObj:", mapObj);
+    return { mapObj, dataMap, allValues, loadingMap, mapError };
+  }
+
+  // Use the hook inside the component (top-level of App)
+  const { mapObj, dataMap, allValues, loadingMap, mapError } = useKeyValueMap("/data/prev_data.txt");
+
+  /**
+   * Build prevIndexOhlc object from the parsed map
+   * Keys used are normalized (camelCase) by the hook: prevClose, open, high, low, close
+   * We also coerce values to Number where appropriate and fallback to null.
+   */
+  const prevIndexOhlc = {
+    previousClose: (() => {
+      const v = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    open: (() => {
+      const v = dataMap.get("open") ?? mapObj.open;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    high: (() => {
+      const v = dataMap.get("high") ?? mapObj.high;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    low: (() => {
+      const v = dataMap.get("low") ?? mapObj.low;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    close: (() => {
+      const v = dataMap.get("close") ?? mapObj.close;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    closePts: (() => {
+      const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
+      const c = dataMap.get("close") ?? mapObj.close;
+      const v = (c - pc).toFixed(2);
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    avgPts: (() => {
+      const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
+      const h = dataMap.get("high") ?? mapObj.high;
+      const l = dataMap.get("low") ?? mapObj.low;
+      const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
+      const v = (mntm/2).toFixed(2);
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    avgPtsHalf: (() => {
+      const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
+      const h = dataMap.get("high") ?? mapObj.high;
+      const l = dataMap.get("low") ?? mapObj.low;
+      const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
+      const v = (mntm/4).toFixed(2);
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    avgStrike: (() => {
+      const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
+      const h = dataMap.get("high") ?? mapObj.high;
+      const l = dataMap.get("low") ?? mapObj.low;
+      const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
+      const ap = (mntm/2).toFixed(2);
+      const v = (Math.max(h, pc) - ap).toFixed(2);
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    support: (() => {
+      const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
+      const h = dataMap.get("high") ?? mapObj.high;
+      const l = dataMap.get("low") ?? mapObj.low;
+      const c = dataMap.get("close") ?? mapObj.close;
+      const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
+      const ap = Number((mntm / 2).toFixed(2)); //(mntm/2).toFixed(2);
+      const v = c - ap;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    resistance: (() => {
+      const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
+      const h = dataMap.get("high") ?? mapObj.high;
+      const l = dataMap.get("low") ?? mapObj.low;
+      const c = dataMap.get("close") ?? mapObj.close;
+      const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
+      const ap = Number((mntm / 2).toFixed(2));  // explicitly numeric
+      const v = Number(c) + ap; // Without Number c operand behaves like string for + operator in JS
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+  };
+  // ------------------- REPLACEMENT END -------------------
 
   async function fetchOptionChain() {
     try {
@@ -333,7 +583,6 @@ export default function App() {
   }, [rows]);
 
 
-
   // fetch once (or poll at interval) - adapt polling logic as needed
   useEffect(() => {
     let cancelled = false;
@@ -439,6 +688,25 @@ export default function App() {
     return c - avg;
   }, [indexOhlc]);
 
+  const closePlusAvg = useMemo(() => {
+    if (!indexOhlc) return null;
+    const c = Number(indexOhlc.last ?? indexOhlc.lastValue ?? indexOhlc.value);
+    const avg = Number(indexOhlc.avg_val ?? indexOhlc.avgValue ?? 0);
+    if (!Number.isFinite(c) || !Number.isFinite(avg)) return null;
+    return c + avg;
+  }, [indexOhlc]);
+
+  const { avgStrike, lastMinusAvg, lastPlusAvg } = useMemo(() => {
+    if (!indexOhlc) return { avgStrike: null, lastMinusAvg: null, lastPlusAvg:null };
+    const high = Number(indexOhlc.high ?? NaN);
+    const avg  = Number(indexOhlc.avg_val ?? NaN);
+    const last = Number(indexOhlc.last ?? NaN);
+    const avgStrike = Number.isFinite(high) && Number.isFinite(avg) ? (high - avg) : null;
+    const lastMinusAvg = Number.isFinite(last) && Number.isFinite(avg) ? (last - avg) : null;
+    const lastPlusAvg = Number.isFinite(last) && Number.isFinite(avg) ? (last + avg) : null;
+    return { avgStrike, lastMinusAvg, lastPlusAvg };
+  }, [indexOhlc]);
+
   // chart options
   const candleOptions = useMemo(() => ({
     chart: { type: "candlestick", height: 360, animations: { enabled: false }, toolbar: { show: true } },
@@ -467,13 +735,13 @@ export default function App() {
     if (pcr_window == null) return null;
 
     if (pcr_window > 1.2) {
-      return { side: "CE", text: `Suggest: CE BUY (PCR > 1.2) (PCR ${pcr_window.toFixed(3)})`, color: "#074" };
+      return { side: "CE", text: `Suggest: CE BUY (PCR > 1.2) (PCR: ${pcr_window.toFixed(3)})`, color: "#074" };
     }
     if (pcr_window < 0.8) {
-      return { side: "PE", text: `Suggest: PE BUY (PCR < 0.8) (PCR ${pcr_window.toFixed(3)})`, color: "#a00" };
+      return { side: "PE", text: `Suggest: PE BUY (PCR < 0.8) (PCR: ${pcr_window.toFixed(3)})`, color: "#a00" };
     }
     // Sideways case (between 0.8 and 1.2 inclusive)
-    return { side: "SIDEWAYS", text: `Suggest: Sideways (PCR ${pcr_window.toFixed(3)})`, color: "#555" };
+    return { side: "SIDEWAYS", text: `Suggest: Sideways (PCR: ${pcr_window.toFixed(3)})`, color: "#555" };
   }, [pcr_window]);
 
 
@@ -845,7 +1113,45 @@ export default function App() {
                     <div>
                       <strong> Last:</strong> {indexOhlc?.last ?? "-"}
                     </div>
-                    {/*<div><strong> Momentum:</strong> {indexOhlc?.momentum ?? "-"}</div>*/}
+                    <div>
+                      <strong>Avg Strike:</strong> { avgStrike == null ? "-" : avgStrike.toFixed(2) }
+                    </div>
+                    <div>
+                      <strong>Gap:</strong>{" "}
+                      {indexOhlc && indexOhlc.gap? (
+                        <span
+                          style={{
+                            color:
+                              indexOhlc.gap > 0
+                                ? "green"
+                                : "red",
+                            fontWeight: 600,
+                          }}
+                        > 
+                          {indexOhlc?.gap.toFixed(2) ?? "-"}
+                        </span>
+                      ) : (
+                        "-"
+                      )}
+                    </div>
+                    <div>
+                      <strong>Close:</strong>{" "}
+                      {indexOhlc && indexOhlc.close? (
+                        <span
+                          style={{
+                            color:
+                              indexOhlc.close > 0
+                                ? "green"
+                                : "red",
+                            fontWeight: 600,
+                          }}
+                        > 
+                          {indexOhlc?.close.toFixed(2) ?? "-"}
+                        </span>
+                      ) : (
+                        "-"
+                      )}
+                    </div>
                     <div>
                       <strong> Momentum:</strong>{" "}
                       {safeNum(indexOhlc?.momentum ?? "-", 2)}
@@ -854,6 +1160,7 @@ export default function App() {
                       <strong>Avg:</strong>{" "}
                       {indexOhlc?.avg_val?.toFixed(2) ?? "-"}
                     </div>
+                    {/*
                     <div>
                       <strong>Close - Avg:</strong>{" "}
                       {indexOhlc && indexOhlc.last && indexOhlc.avg_val
@@ -861,25 +1168,57 @@ export default function App() {
                         : "-"}
                     </div>
                     <div>
+                      <strong>Close + Avg:</strong>{" "}
+                      {indexOhlc && indexOhlc.last && indexOhlc.avg_val
+                        ? (indexOhlc.last + indexOhlc.avg_val).toFixed(2)
+                        : "-"}
+                    </div>
+                    */}
+                    <div>
                       <strong>Trend:</strong>{" "}
-                      {indexOhlc && indexOhlc.last && indexOhlc.avg_val ? (
+                      {indexOhlc && indexOhlc.last && indexOhlc.avg_strike ? (
                         <span
                           style={{
                             color:
-                              indexOhlc.last > indexOhlc.avg_val
+                              indexOhlc.last > indexOhlc.avg_strike
                                 ? "green"
                                 : "red",
                             fontWeight: 600,
                           }}
                         >
-                          {indexOhlc.last > indexOhlc.avg_val
-                            ? "Uptrend"
-                            : "Downtrend"}
+                          {indexOhlc.last > indexOhlc.avg_strike
+                            ? "Uptrend (OLHC)"
+                            : "Downtrend (OHLC)"}
                         </span>
                       ) : (
                         "-"
                       )}
                     </div>
+                    <div style={{ marginTop: 8 }}>
+                      <div>
+                        <strong style={{ marginLeft: 12 }}>Close - Avg:</strong>{" "}
+                        {indexOhlc && indexOhlc.last && avgStrike
+                          ? (indexOhlc.last - avgStrike).toFixed(2)
+                          : "-"}
+                      </div>
+                      <div>
+                        <strong style={{ marginLeft: 12 }}>
+                          Last + Avg (Next Resistance):
+                          <span style={{ color: lastPlusAvg == null ? "inherit" : (lastPlusAvg < avgStrike ? "red" : "green"), marginLeft: 6 }}>
+                            { lastPlusAvg == null ? "-" : lastPlusAvg.toFixed(2) }
+                          </span>
+                        </strong>
+                      </div>
+                      <div>
+                        <strong style={{ marginLeft: 12 }}>
+                          Last - Avg (Next Support):
+                          <span style={{ color: lastMinusAvg == null ? "inherit" : (lastMinusAvg < avgStrike ? "red" : "green"), marginLeft: 6 }}>
+                            { lastMinusAvg == null ? "-" : lastMinusAvg.toFixed(2) }
+                          </span>
+                        </strong>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 8 }}><span>{'Entry at ± SPOT means getting move ± Close. => Is it Possible?'}</span></div>
                   </div>
                   <div
                     className="text-xs text-gray-500"
@@ -888,10 +1227,18 @@ export default function App() {
                     Polling: {pollMs ? `${pollMs / 1000}s` : "Manual"}
                   </div>
                   <div>
-                    <strong>Advance:</strong> {marketStats?.advance ?? "-"}
+                    <strong>Advance: 
+                      <span style={{ color: marketStats?.advance == null ? "inherit" : (marketStats?.advance < marketStats?.decline ? "red" : "green") }}>
+                        { marketStats?.advance == null ? "-" : marketStats?.advance }
+                      </span> 
+                    </strong>
                   </div>
                   <div>
-                    <strong>Decline:</strong> {marketStats?.decline ?? "-"}
+                    <strong>Decline: 
+                      <span style={{ color: marketStats?.decline == null ? "inherit" : (marketStats?.decline < marketStats?.advance ? "red" : "green") }}>
+                        { marketStats?.decline == null ? "-" : marketStats?.decline }
+                      </span> 
+                    </strong>
                   </div>
                 </div>
               </div>
@@ -969,6 +1316,7 @@ export default function App() {
           {/* show placeholder until indexOhlc is available */}
           {indexOhlc ? (
             <PivotPcrTables
+              prevIndexOhlc={prevIndexOhlc}
               indexOhlc={indexOhlc}
               strikeAgg={strikeAgg}
               atmStrike={atmStrike}

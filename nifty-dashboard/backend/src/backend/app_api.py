@@ -277,7 +277,16 @@ def index_ohlc():
     if prev_close and high and low:
         momentum = max(high - low, abs(high - prev_close), abs(low - prev_close))
         avg_val = momentum/2
-
+    
+    close = None
+    if prev_close and last:
+        close = last - prev_close
+        avg_strike = max(prev_close, high) - avg_val
+    
+    gap = None
+    if prev_close and open_:
+        gap = open_ - prev_close
+        
     return jsonify({
         "indexName": "NIFTY 50",
         "last": last,
@@ -285,13 +294,17 @@ def index_ohlc():
         "high": high,
         "low": low,
         "prev_close": prev_close,
+        "avg_strike": avg_strike,
         "momentum": momentum,
-        "avg_val": avg_val
+        "avg_val": avg_val,
+        "close": close,
+        "gap": gap
     })
 
 # endpoint: market statistics (advance/decline)
 @app.route("/api/nifty/market_stats")
 def market_stats():
+    
     src = "https://www.nseindia.com/api/NextApi/apiClient?"
     params = {
         "functionName": "getMarketStatistics"

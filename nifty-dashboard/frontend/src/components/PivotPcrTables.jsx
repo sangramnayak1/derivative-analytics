@@ -25,26 +25,20 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
     const fmtFixed = (v, dp = 2) => (v == null ? "—" : Number(v).toFixed(dp));
 
     // ---- pivot calculations (classic pivot) ----
-    // ---- pivot calculations (classic pivot) ----
     // use prevIndexOhlc if provided, otherwise fallback to indexOhlc
     const pivotData = useMemo(() => {
-        const source = prevIndexOhlc ?? indexOhlc; // prefer previous day OHLC when passed
+        const source = prevIndexOhlc;   // strictly use previous day OHLC for pivots
+        console.log("Pivot calc input:", { prevIndexOhlc, indexOhlc });
         if (!source) return null;
 
-        const hRaw = source?.high ?? source?.h ?? source?.highPrice;
-        const lRaw = source?.low ?? source?.l ?? source?.lowPrice;
-        const cRaw = source?.last ?? source?.close ?? source?.previousClose ?? source?.prev_close ?? source?.open;
+        const h = Number(source?.high ?? source?.h);
+        const l = Number(source?.low ?? source?.l);
+        const c = Number(source?.close ?? source?.c ?? source?.previousClose);
 
-        const h = Number(hRaw);
-        const l = Number(lRaw);
-        const c = Number(cRaw);
+        if (![h, l, c].every(v => Number.isFinite(v))) return null;
 
-        if (![h, l, c].every(v => Number.isFinite(v))) {
-            // Not enough data yet
-            return null;
-        }
-
-        const P = (h + l + c) / 3.0;
+        // Classic pivots from previous day
+        const P  = (h + l + c) / 3.0;
         const R1 = (2 * P) - l;
         const S1 = (2 * P) - h;
         const R2 = P + (h - l);
@@ -52,12 +46,13 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
         const R3 = h + 2 * (P - l);
         const S3 = l - 2 * (h - P);
 
-        // indexVal (for pivot difference) should use current index value if available from indexOhlc,
-        // otherwise use the same source (prevIndexOhlc) so PD shows something reasonable.
-        const indexVal = Number(indexOhlc?.last ?? indexOhlc?.close ?? indexOhlc?.prev_close ?? source?.last ?? NaN);
+        const momentum = R1 - S1;
+
+        // Today’s price for difference
+        const indexVal = Number(indexOhlc?.last ?? indexOhlc?.prev_close ?? NaN);
         const pd = (level) => (Number.isFinite(indexVal) ? (indexVal - level) : null);
 
-        // NEW: gap = distance from CP (pivot) to each level (positive numbers)
+        // Gap is relative distance from pivot
         const gap = {
             S3: S3 - P,
             S2: S2 - P,
@@ -65,17 +60,21 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
             CP: 0,
             R1: R1 - P,
             R2: R2 - P,
-            R3: R3 - P
+            R3: R3 - P,
         };
 
         return {
             P, R1, R2, R3, S1, S2, S3,
             indexVal,
-            gap,                        // <-- added
+            gap,
             pivotDiff: {
-                S3: pd(S3), S2: pd(S2), S1: pd(S1), CP: pd(P), R1: pd(R1), R2: pd(R2), R3: pd(R3)
-            }
+                S3: pd(S3), S2: pd(S2), S1: pd(S1),
+                CP: pd(P),
+                R1: pd(R1), R2: pd(R2), R3: pd(R3),
+            },
+            momentum
         };
+        console.log("Pivot calc input:", { prevIndexOhlc, indexOhlc });
     }, [indexOhlc, prevIndexOhlc]);
 
 
@@ -216,6 +215,8 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
         return { ATM, ITM, OTM, TOTAL, maxPain };
     }, [strikeAgg, atmStrike, windowStats]);
 
+
+
   // ---- render ----
   return (
     <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
@@ -229,42 +230,53 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
         }}>
             <h3 style={{ marginTop: 0 }}>Support - Resistance Table</h3>
             {pivotData ? (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                <thead>
-                <tr>
-                    <th style={{ textAlign: "left", padding: 6 }}>Zone</th>
-                    <th style={{ textAlign: "left", padding: 6 }}>Index</th>
-                    <th style={{ textAlign: "left", padding: 6 }}>Pivot Gap (Index − CP)</th>
-                    <th style={{ textAlign: "left", padding: 6 }}>Pivot Difference (Last - Index)</th>
-                </tr>
-                </thead>
-                <tbody>
-                    {["S3","S2","S1","CP","R1","R2","R3"].map((z) => {
-                        const level = pivotData[z === "CP" ? "P" : z];
-                        const gap = pivotData?.gap?.[z];
-                        const pd = pivotData?.pivotDiff?.[z];
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                    <thead>
+                    <tr>
+                        <th style={{ textAlign: "left", padding: 6 }}>Zone</th>
+                        <th style={{ textAlign: "left", padding: 6 }}>Index</th>
+                        <th style={{ textAlign: "left", padding: 6 }}>Pivot Gap (Index − CP)</th>
+                        <th style={{ textAlign: "left", padding: 6 }}>Pivot Difference (Last - Index)</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                        {/*{["S3","S2","S1","CP","R1","R2","R3"].map((z) => {*/}
+                        {["R3","R2","R1","CP","S1","S2","S3"].map((z) => {
+                            const level = pivotData[z === "CP" ? "P" : z];
+                            const gap = pivotData?.gap?.[z];
+                            const pd = pivotData?.pivotDiff?.[z];
 
-                        // highlight CP row
-                        const rowStyle = z === "CP"
-                        ? { background: "#fff7ed", fontWeight: 600 } // light orange, bold
-                        : {};
+                            // highlight CP row
+                            const rowStyle = z === "CP"
+                            ? { background: "#fff7ed", fontWeight: 600 } // light orange, bold
+                            : {};
 
-                        return (
-                        <tr key={z} style={rowStyle}>
-                            <td style={{ padding: 8, fontWeight: 600 }}>{z}</td>
-                            <td style={{ padding: 8 }}>{ level == null ? "—" : fmtFixed(level, 2) }</td>
-                            <td style={{ padding: 8 }}>{ gap == null ? "—" : fmtNum(gap, 2) }</td>
-                            <td style={{ padding: 8 }}>{ pd == null ? "—" : fmtNum(pd, 2) }</td>
+                            return (
+                                <tr key={z} style={rowStyle}>
+                                    <td style={{ padding: 8, fontWeight: 600 }}>{z}</td>
+                                    <td style={{ padding: 8 }}>{ level == null ? "—" : fmtFixed(level, 2) }</td>
+                                    {/*<td style={{ padding: 8 }}>{ gap == null ? "—" : fmtNum(gap, 2) }</td>
+                                    <td style={{ padding: 8 }}>{ pd == null ? "—" : fmtNum(pd, 2) }</td>*/}
+                                    <td style={{ padding: 8 }}>{ gap == null ? "—" : gap.toFixed(2) }</td>
+                                    <td style={{ padding: 8 }}>{ pd == null ? "—" : pd.toFixed(2) }</td>
+                                </tr>
+                            );
+                        })}
+
+                        <tr>
+                            <td style={{ padding: 8 }}>Momentum:</td>
+                            <td style={{ padding: 8 }}>{pivotData?.momentum.toFixed(2) ?? "—"}</td>
+                            <td style={{ padding: 8 }}></td>
+                            <td style={{ padding: 8 }}></td>
                         </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
             ) : (
                 <div style={{ color: "#666" }}>Index OHLC required for pivot calculation</div>
             )}
         </div>
-
+        
+        <div><pre>{ JSON.stringify(prevIndexOhlc, null, 2) }</pre></div>
 
         {/* PCR Table card */}
         <div style={{
