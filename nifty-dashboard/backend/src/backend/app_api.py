@@ -273,11 +273,12 @@ def index_ohlc():
     low = float(found.get("low") or 0)
     prev_close = float(found.get("previousClose") or found.get("prevClose") or 0)
 
+    momentum = None
     avg_val = None
     if prev_close and high and low:
         momentum = max(high - low, abs(high - prev_close), abs(low - prev_close))
         avg_val = momentum/2
-    
+
     close = None
     if prev_close and last:
         close = last - prev_close

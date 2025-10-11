@@ -13,12 +13,13 @@ import {
   Legend,
   ResponsiveContainer,
   AreaChart,
-  Area
+  Area,
+  ReferenceLine
 } from "recharts";
 import Chart from "react-apexcharts";
 import { DownloadCloud } from "lucide-react";
 import PivotPcrTables from "./components/PivotPcrTables";
-
+import LiveSRPLevelPlot from "./components/LiveSRPLevelPlot";
 
   // Example prevIndexOhlc object (you should fill these with previous day's real values)
   /*
@@ -295,6 +296,15 @@ export default function App() {
       const n = Number(v);
       return Number.isFinite(n) ? n : (v || null);
     })(),
+    momentumPts: (() => {
+      const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
+      const h = dataMap.get("high") ?? mapObj.high;
+      const l = dataMap.get("low") ?? mapObj.low;
+      const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
+      const v = (mntm).toFixed(2);
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
     avgPts: (() => {
       const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
       const h = dataMap.get("high") ?? mapObj.high;
@@ -304,12 +314,21 @@ export default function App() {
       const n = Number(v);
       return Number.isFinite(n) ? n : (v || null);
     })(),
-    avgPtsHalf: (() => {
+    avgQ2Pts: (() => {
       const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
       const h = dataMap.get("high") ?? mapObj.high;
       const l = dataMap.get("low") ?? mapObj.low;
       const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
       const v = (mntm/4).toFixed(2);
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    avgQ4Pts: (() => {
+      const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
+      const h = dataMap.get("high") ?? mapObj.high;
+      const l = dataMap.get("low") ?? mapObj.low;
+      const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
+      const v = (mntm/8).toFixed(2);
       const n = Number(v);
       return Number.isFinite(n) ? n : (v || null);
     })(),
@@ -323,25 +342,14 @@ export default function App() {
       const n = Number(v);
       return Number.isFinite(n) ? n : (v || null);
     })(),
-    support_2: (() => {
+    resistance_2: (() => {
       const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
       const h = dataMap.get("high") ?? mapObj.high;
       const l = dataMap.get("low") ?? mapObj.low;
       const c = dataMap.get("close") ?? mapObj.close;
       const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
-      const ap = Number((mntm / 2).toFixed(2)); //(mntm/2).toFixed(2);
-      const v = c - ap;
-      const n = Number(v);
-      return Number.isFinite(n) ? n : (v || null);
-    })(),
-    support_1: (() => {
-      const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
-      const h = dataMap.get("high") ?? mapObj.high;
-      const l = dataMap.get("low") ?? mapObj.low;
-      const c = dataMap.get("close") ?? mapObj.close;
-      const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
-      const ap = Number((mntm / 2).toFixed(2)); //(mntm/2).toFixed(2);
-      const v = c - ap/2;
+      const ap = Number((mntm / 2).toFixed(2));  // explicitly numeric
+      const v = (Number(c) + ap).toFixed(2); // Without Number c operand behaves like string for + operator in JS
       const n = Number(v);
       return Number.isFinite(n) ? n : (v || null);
     })(),
@@ -352,18 +360,29 @@ export default function App() {
       const c = dataMap.get("close") ?? mapObj.close;
       const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
       const ap = Number((mntm / 2).toFixed(2));  // explicitly numeric
-      const v = Number(c) + ap/2; // Without Number c operand behaves like string for + operator in JS
+      const v = (Number(c) + ap/2).toFixed(2); // Without Number c operand behaves like string for + operator in JS
       const n = Number(v);
       return Number.isFinite(n) ? n : (v || null);
     })(),
-    resistance_2: (() => {
+    support_1: (() => {
       const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
       const h = dataMap.get("high") ?? mapObj.high;
       const l = dataMap.get("low") ?? mapObj.low;
       const c = dataMap.get("close") ?? mapObj.close;
       const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
-      const ap = Number((mntm / 2).toFixed(2));  // explicitly numeric
-      const v = Number(c) + ap; // Without Number c operand behaves like string for + operator in JS
+      const ap = Number((mntm / 2).toFixed(2)); //(mntm/2).toFixed(2);
+      const v = (c - ap/2).toFixed(2);
+      const n = Number(v);
+      return Number.isFinite(n) ? n : (v || null);
+    })(),
+    support_2: (() => {
+      const pc = dataMap.get("prevClose") ?? dataMap.get("previousClose") ?? mapObj.prevClose ?? mapObj.previousClose;
+      const h = dataMap.get("high") ?? mapObj.high;
+      const l = dataMap.get("low") ?? mapObj.low;
+      const c = dataMap.get("close") ?? mapObj.close;
+      const mntm = Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc));
+      const ap = Number((mntm / 2).toFixed(2)); //(mntm/2).toFixed(2);
+      const v = (c - ap).toFixed(2);
       const n = Number(v);
       return Number.isFinite(n) ? n : (v || null);
     })()
@@ -1165,7 +1184,7 @@ export default function App() {
                       )}
                     </div>
                     <div>
-                      <strong>Close:</strong>{" "}
+                      <strong>Close Pts:</strong>{" "}
                       {indexOhlc && indexOhlc.close? (
                         <span
                           style={{
@@ -1183,12 +1202,26 @@ export default function App() {
                       )}
                     </div>
                     <div>
+                      <strong>{'Last > Avg by:'}</strong>{" "}
+                        <span style={{ color: indexOhlc == null ? "inherit" : (indexOhlc?.close < (indexOhlc?.last - avgStrike) ? "red" : "green"), fontWeight: 600 }}>
+                          { indexOhlc?.close == null ? "-" : (indexOhlc?.last - avgStrike).toFixed(2) }{" pts"}
+                        </span>
+                    </div>
+                    <div>
                       <strong>Momentum:</strong>{" "}
                       {safeNum(indexOhlc?.momentum ?? "-", 2)}
                     </div>
                     <div>
-                      <strong>Avg:</strong>{" "}
+                      <strong>Avg Pts:</strong>{" "}
                       {indexOhlc?.avg_val?.toFixed(2) ?? "-"}
+                    </div>
+                    <div>
+                      <strong>Avg Q2 Pts:</strong>{" "}
+                      {(indexOhlc?.avg_val/2).toFixed(2) ?? "-"}
+                    </div>
+                    <div>
+                      <strong>Avg Q4 Pts:</strong>{" "}
+                      {(indexOhlc?.avg_val/4).toFixed(2) ?? "-"}
                     </div>
                     {/*
                     <div>
@@ -1204,12 +1237,12 @@ export default function App() {
                         : "-"}
                     </div>
                     */}
-                    <div>
+                    {/*<div>
                       <strong>Close - Avg:</strong>{" "}
                       {indexOhlc && indexOhlc.last && avgStrike
                         ? (indexOhlc.last - avgStrike).toFixed(2)
                         : "-"}
-                    </div>
+                    </div>*/}
                     <div>
                       <strong>Trend:</strong>{" "}
                       {indexOhlc && indexOhlc.last && indexOhlc.avg_strike ? (
@@ -1231,52 +1264,60 @@ export default function App() {
                       )}
                     </div>
 
-                    <div>
-                      <strong><u>Live SRP Level close confirmed by ±10 pts:</u></strong>
+                    <div style={{ marginTop: 8 }}>
+                      <div>
+                        <strong style={{ color: '#432ecaff' }}>SRP close confirm/reject by ±{ (indexOhlc?.avg_val/4).toFixed(2) } pts:</strong>
+                      </div>
+                      <div className="flex justify-between flex-wrap text-sm text-gray-700">
+                        {/* Resistance Column */}
+                        <div className="flex justify-between space-x-4"> 
+                            <div className="flex-1 space-y-0">
+                              <strong style={{ marginLeft: 12 }}>
+                                Resistance2 (Nx S1):
+                                <span style={{ color: lastPlusAvg2 == null ? "inherit" : (lastPlusAvg2 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
+                                  { lastPlusAvg2 == null ? "-" : lastPlusAvg2.toFixed(2) } { " - " + roundToNearest(lastPlusAvg2, ROUNDING_MULTIPLE) }
+                                </span>
+                              </strong>
+                            </div>
+                            <div className="flex-1 space-y-0">
+                              <strong style={{ marginLeft: 12 }}>
+                                Resistance1 (Nx S2):
+                                <span style={{ color: lastPlusAvg1 == null ? "inherit" : (lastPlusAvg1 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
+                                  { lastPlusAvg1 == null ? "-" : lastPlusAvg1.toFixed(2) } { " - " + roundToNearest(lastPlusAvg1, ROUNDING_MULTIPLE) }
+                                </span>
+                              </strong>
+                            </div>
+                            <div className="flex-1 space-y-0">
+                              <strong style={{ marginLeft: 12, color: '#f07e14ff'}}>{'Spot (> Avg) Strike:'}</strong>
+                              <strong>
+                                <span style={{ color: indexOhlc?.last == null ? "inherit" : (indexOhlc?.last < avgStrike ? "red" : "green"), marginLeft: 6 }}>
+                                  { indexOhlc?.last ?? "-" } { " - " + roundToNearest(indexOhlc?.last, ROUNDING_MULTIPLE) }
+                                </span>
+                              </strong>
+                            </div>
+                        </div>
+                        {/* Support Column */}
+                        <div className="flex justify-between space-x-4">
+                            <div className="flex-1 space-y-0">
+                              <strong style={{ marginLeft: 12 }}>
+                                Support1 (Pv R2):
+                                <span style={{ color: lastMinusAvg1 == null ? "inherit" : (lastMinusAvg1 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
+                                  { lastMinusAvg1 == null ? "-" : lastMinusAvg1.toFixed(2) } { " - " + roundToNearest(lastMinusAvg1, ROUNDING_MULTIPLE) }
+                                </span>
+                              </strong>  
+                            </div>
+                            <div className="flex-1 space-y-0">                    
+                              <strong style={{ marginLeft: 12 }}>
+                                Support2 (Pv R1):
+                                <span style={{ color: lastMinusAvg2 == null ? "inherit" : (lastMinusAvg2 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
+                                  { lastMinusAvg2 == null ? "-" : lastMinusAvg2.toFixed(2) } { " - " + roundToNearest(lastMinusAvg2, ROUNDING_MULTIPLE) }
+                                </span>
+                              </strong>
+                            </div>
+                        </div>
+                      </div>
                       <div style={{ marginTop: 8 }}>
-                        <div className="flex justify-between flex-wrap text-sm text-gray-700">
-                          {/* Resistance Column */}
-                          <div className="w-1/2 min-w-[50%]"> 
-                              <div style={{ marginBottom: 4 }}>
-                                <strong style={{ marginLeft: 12 }}>
-                                  Next Resistance 2:
-                                  <span style={{ color: lastPlusAvg2 == null ? "inherit" : (lastPlusAvg2 < avgStrike ? "red" : "green"), marginLeft: 6 }}>
-                                    { lastPlusAvg2 == null ? "-" : lastPlusAvg2.toFixed(2) } { " - " + roundToNearest(lastPlusAvg2, ROUNDING_MULTIPLE) }
-                                  </span>
-                                </strong>
-                              </div>
-                              <div>
-                                <strong style={{ marginLeft: 12 }}>
-                                  Next Resistance 1:
-                                  <span style={{ color: lastPlusAvg1 == null ? "inherit" : (lastPlusAvg1 < avgStrike ? "red" : "green"), marginLeft: 6 }}>
-                                    { lastPlusAvg1 == null ? "-" : lastPlusAvg1.toFixed(2) } { " - " + roundToNearest(lastPlusAvg1, ROUNDING_MULTIPLE) }
-                                  </span>
-                                </strong>
-                              </div>
-                          </div>
-                          {/* Support Column */}
-                          <div className="w-1/2 min-w-[50%]">
-                              <div style={{ marginBottom: 4 }}>
-                                <strong style={{ marginLeft: 12 }}>
-                                  Next Support 1:
-                                  <span style={{ color: lastMinusAvg1 == null ? "inherit" : (lastMinusAvg1 < avgStrike ? "red" : "green"), marginLeft: 6 }}>
-                                    { lastMinusAvg1 == null ? "-" : lastMinusAvg1.toFixed(2) } { " - " + roundToNearest(lastMinusAvg1, ROUNDING_MULTIPLE) }
-                                  </span>
-                                </strong>  
-                              </div>
-                              <div>                    
-                                <strong style={{ marginLeft: 12 }}>
-                                  Next Support 2:
-                                  <span style={{ color: lastMinusAvg2 == null ? "inherit" : (lastMinusAvg2 < avgStrike ? "red" : "green"), marginLeft: 6 }}>
-                                    { lastMinusAvg2 == null ? "-" : lastMinusAvg2.toFixed(2) } { " - " + roundToNearest(lastMinusAvg2, ROUNDING_MULTIPLE) }
-                                  </span>
-                                </strong>
-                              </div>
-                          </div>
-                        </div>
-                        <div style={{ marginTop: 8 }}>
-                            <span className="text-xs text-gray-500">{'Entry at ± SPOT means Nifty should move ± CLOSE pts. ----> Is it Possible to take Entry?'}</span>
-                        </div>
+                          <span className="text-xs text-gray-500">{'Entry at ±SPOT means Nifty should move ±CLOSE pts. --> Is it possible to take Entry?'}</span>
                       </div>
                     </div>
 
@@ -1337,6 +1378,32 @@ export default function App() {
                 </ResponsiveContainer>
               </div>
             </div>
+            
+            {/* Live SRP Level Visualization */}
+            <div
+            style={{
+              marginTop: 18,
+              padding: 12,
+              border: "1px solid #e5e7eb",
+              borderRadius: 6,
+              background: "#fff",
+              }}
+            >
+            {/* show placeholder until indexOhlc is available */}
+            {indexOhlc ? (
+              <LiveSRPLevelPlot 
+                spot={indexOhlc?.last}
+                r2={lastPlusAvg2}
+                r1={lastPlusAvg1}
+                s1={lastMinusAvg1}
+                s2={lastMinusAvg2}
+              />
+            ) : (
+                <div style={{ padding: 12, color: "#666" }}>
+                  Loading Live SRP Level…
+                </div>
+              )}
+            </div>
 
             <div
               style={{
@@ -1347,7 +1414,7 @@ export default function App() {
                 background: "#fff",
               }}
             >
-              <h3 style={{ marginTop: 0 }}>Underlying Candles</h3>
+              <h3 style={{ marginTop: 0 }}>Underlying Candles:</h3>
               <div>
                 {/* optionally show the raw indexOhlc for debug */}
                 {/*<pre style={{fontSize:12}}>{indexOhlc ? JSON.stringify(indexOhlc, null, 2) : "indexOhlc: loading..."}</pre>*/}

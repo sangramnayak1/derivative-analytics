@@ -215,6 +215,19 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
         return { ATM, ITM, OTM, TOTAL, maxPain };
     }, [strikeAgg, atmStrike, windowStats]);
 
+    // Helper to convert camelCase keys (e.g., "previousClose") to Title Case ("Previous Close")
+    const formatKey = (key) => {
+        // 1. Insert space before all capital letters
+        // 2. Trim whitespace
+        // 3. Convert first letter to uppercase
+        return key
+        .replace(/([A-Z])/g, ' $1')
+        .trim()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    };
+
 
 
   // ---- render ----
@@ -276,7 +289,72 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
             )}
         </div>
         
-        <div><pre>{ JSON.stringify(prevIndexOhlc, null, 2) }</pre></div>
+        {/* <div><pre>{ JSON.stringify(prevIndexOhlc, null, 2) }</pre></div> */}
+        
+        <div style={{
+            flex: "1 1 360px",
+            border: "1px solid #eee",
+            borderRadius: 8,
+            padding: 12,
+            background: "#fff"
+        }}>
+            <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm border border-gray-300">
+                <h3 style={{ marginTop: 0 }} className="text-xl font-bold mb-3 border-b pb-2 text-gray-700">Previous Day Index Metrics</h3>
+                <div className="space-y-2">
+                    {Object.entries(prevIndexOhlc).map(([key, value]) => (
+                        <div key={key} 
+                            style={{ 
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr'
+                            }} 
+                            className="items-center text-sm font-medium border-b border-gray-50/50 pb-1 last:border-b-0 last:last:pb-0"
+                        >
+                            {/* Column 1: Key (Label) - Left Aligned */}
+                            <span 
+                                className="pr-2"
+                                // FIX: Forcing text color inline to override external CSS rules.
+                                style={{ color: '#6b7280' }} // Tailwind's gray-500 hex value
+                            >
+                                {formatKey(key)}:
+                            </span>
+
+                            {/* Column 2: Value (Data) - Right Aligned */}
+                            <span 
+                                className="text-gray-800 text-right"
+                                // FIX: Forcing font-weight inline to override external CSS rules.
+                                style={{ fontWeight: '600' }} 
+                            >
+                                {/*{key === 'close' && (
+                                    <span style={{ color: 'green', marginRight: '4px' }}>&#x2713;</span>
+                                )}*/}
+                                {key === 'close' && (
+                                    <span 
+                                    style={{ 
+                                        // Conditional color: red if close < previousClose, otherwise green
+                                        color: prevIndexOhlc.close < prevIndexOhlc.previousClose ? 'red' : 'green', 
+                                        marginLeft: '4px' 
+                                    }}
+                                    >
+                                        &#x2713;
+                                    </span>
+                                )}
+                                {
+                                    // Format numbers to 2 decimal places, otherwise display as is
+                                    typeof value === 'number' 
+                                    ? value.toFixed(2) 
+                                    : value
+                                }
+                                {/*
+                                {key === 'close' && (
+                                    <span style={{ color: 'green', marginLeft: '4px' }}>&#x2713;</span>
+                                )}
+                                */}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
 
         {/* PCR Table card */}
         <div style={{
