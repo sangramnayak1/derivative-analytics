@@ -1632,7 +1632,10 @@ export default function App() {
           </div>
         </div>
         
-        <OptionsGreeks initialAtmStrike={ 25300 }/>
+        <OptionsGreeks 
+          initialAtmStrike={ 25300 }
+          expMove={ 100 }
+        />
 
         <div style={{ marginTop: 12, color: "#6b7280" }}>
           Rows: {rows.length} • Filtered: {filtered.length}

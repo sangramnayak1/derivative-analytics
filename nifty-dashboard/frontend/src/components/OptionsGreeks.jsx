@@ -8,16 +8,16 @@ import {
   STEP_SIZE,
   RAW_GREEKS_DATA
 } from '../utils/optionsUtils.js'; 
-import OptionGreeksRow from './OptionGreeksRow.jsx'; 
+import OptionGreeksRow from './OptionGreeksRow.jsx';
+import { RefreshCw, Zap, ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
 
 // --- Configuration Parameters ---
 // This is the endpoint for your Python Flask server, now running on port 8000
 const LOCAL_API_URL = 'http://localhost:8000/api/option-chain';
 
-
 // --- Main OptionGreeks Component ---
 // Accepts initialAtmStrike from a parent component (App.jsx)
-const OptionGreeks = ({ initialAtmStrike }) => {
+const OptionGreeks = ({ initialAtmStrike, expMove }) => {
   
   const [optionsData, setOptionsData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -134,8 +134,8 @@ const OptionGreeks = ({ initialAtmStrike }) => {
     filtered.sort((a, b) => a.strike_price - b.strike_price);
 
     return filtered.map(item => {
-      const ce = mapOptionData(item.call_options);
-      const pe = mapOptionData(item.put_options);
+      const ce = mapOptionData(item.call_options, expMove);
+      const pe = mapOptionData(item.put_options, expMove);
 
       return {
         strike_price: item.strike_price,
@@ -198,23 +198,33 @@ const OptionGreeks = ({ initialAtmStrike }) => {
             {/* <thead className="bg-indigo-50 sticky top-0 z-10"> */}
             <thead className="bg-indigo-50">
               <tr>
-                {/* CE HEADERS */}
-                <th colSpan="3" className="px-3 py-3 text-xs font-bold uppercase tracking-wider text-center text-indigo-800 border-r border-indigo-200">CALLS (CE)</th>
+                {/* CE HEADERS: 7 columns */}
+                <th colSpan="7" className="px-2 py-3 text-xs font-bold uppercase tracking-wider text-center text-indigo-800 dark:text-indigo-300 border-r-2 border-indigo-300 dark:border-indigo-700">CALLS (CE) <ArrowUp className="inline w-3 h-3 ml-1" /></th>
+
                 {/* STRIKE HEADER */}
-                <th rowSpan={2} className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-center text-gray-900 bg-indigo-200">STRIKE</th>
-                {/* PE HEADERS */}
-                <th colSpan="3" className="px-3 py-3 text-xs font-bold uppercase tracking-wider text-center text-indigo-800 border-l border-indigo-200">PUTS (PE)</th>
+                <th rowSpan={2} className="px-4 py-3 text-sm font-bold uppercase tracking-wider text-center text-gray-900 dark:text-gray-100 bg-indigo-300 dark:bg-indigo-700">STRIKE</th>
+
+                {/* PE HEADERS: 7 columns */}
+                <th colSpan="7" className="px-2 py-3 text-xs font-bold uppercase tracking-wider text-center text-indigo-800 dark:text-indigo-300 border-l-2 border-indigo-300 dark:border-indigo-700">PUTS (PE) <ArrowDown className="inline w-3 h-3 ml-1" /></th>
               </tr>
               <tr>
-                {/* CE SUB HEADERS */}
-                <th className="px-3 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">LTP</th>
-                <th className="px-3 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Theta</th>
-                <th className="px-3 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider border-r border-indigo-200">Delta</th>
+                  {/* CE SUB HEADERS: OI, IV, LTP (Gray), LTP_CH (Cyan), MAX_LTP (Yellow), Theta, Delta */}
+                  <th className="px-2 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">OI</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">IV</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-800 dark:text-gray-200 uppercase tracking-wider bg-gray-200 dark:bg-gray-700">LTP</th>
+                  <th className="px-2 py-2 text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider font-semibold bg-cyan-200 dark:bg-cyan-800">LTP_CH</th>
+                  <th className="px-2 py-2 text-xs font-medium text-yellow-700 dark:text-yellow-300 uppercase tracking-wider font-extrabold bg-yellow-300 dark:bg-yellow-700">MAX_LTP</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Theta</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider border-r border-indigo-200 dark:border-indigo-700">Delta</th>
 
-                {/* PE SUB HEADERS */}
-                <th className="px-3 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider border-l border-indigo-200">Delta</th>
-                <th className="px-3 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Theta</th>
-                <th className="px-3 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">LTP</th>
+                  {/* PE SUB HEADERS: Delta, Theta, MAX_LTP (Yellow), LTP_CH (Cyan), LTP (Gray), IV, OI */}
+                  <th className="px-2 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider border-l border-indigo-200 dark:border-indigo-700">Delta</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Theta</th>
+                  <th className="px-2 py-2 text-xs font-medium text-yellow-700 dark:text-yellow-300 uppercase tracking-wider font-extrabold bg-yellow-300 dark:bg-yellow-700">MAX_LTP</th>
+                  <th className="px-2 py-2 text-xs font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider font-semibold bg-cyan-200 dark:bg-cyan-800">LTP_CH</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-800 dark:text-gray-200 uppercase tracking-wider bg-gray-200 dark:bg-gray-700">LTP</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">IV</th>
+                  <th className="px-2 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">OI</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-100">
