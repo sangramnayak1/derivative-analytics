@@ -13,13 +13,13 @@ import {
   Legend,
   ResponsiveContainer,
   AreaChart,
-  Area,
-  ReferenceLine
+  Area
 } from "recharts";
 import Chart from "react-apexcharts";
 import { DownloadCloud } from "lucide-react";
 import PivotPcrTables from "./components/PivotPcrTables";
 import LiveSRPLevelPlot from "./components/LiveSRPLevelPlot";
+import OptionsGreeks from "./components/OptionsGreeks";
 
   // Example prevIndexOhlc object (you should fill these with previous day's real values)
   /*
@@ -823,12 +823,12 @@ export default function App() {
             alignItems: "center",
           }}
         >
-          <h1 style={{ margin: 0 }}>NIFTY OI Dashboard</h1>
+          <h1 className="text-xl font-bold mb-3 border-b pb-2 text-gray-700" style={{ margin: 0 }}>NIFTY OI Dashboard</h1>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <select
-              style={{ padding: "6px 10px" }}
               value={pollMs}
               onChange={(e) => setPollMs(Number(e.target.value))}
+              //style={{ padding: "6px 10px" }}
             >
               {POLL_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -839,16 +839,16 @@ export default function App() {
             <button
               onClick={fetchAll}
               className="px-3 py-1 bg-sky-600 text-white rounded"
-              style={{ padding: "6px 10px" }}
+              //style={{ padding: "6px 10px" }}
             >
               Fetch
             </button>
             <button
               onClick={onExportCSV}
               className="px-3 py-1 bg-sky-600 text-white rounded"
-              style={{ padding: "6px 10px" }}
+              //style={{ padding: "6px 10px" }}
             >
-              <DownloadCloud size={16} /> Export CSV
+              <DownloadCloud size={16} />
             </button>
           </div>
         </div>
@@ -923,7 +923,7 @@ export default function App() {
                         e.target.value ? Number(e.target.value) : null
                       );
                     }}
-                    style={{ width: 110, padding: 6, height: 12 }}
+                    style={{ width: 110, padding: 6, height: 14 }}
                   />
                   <input
                     type="number"
@@ -935,7 +935,7 @@ export default function App() {
                         e.target.value ? Number(e.target.value) : null
                       );
                     }}
-                    style={{ width: 110, padding: 6, height: 12 }}
+                    style={{ width: 110, padding: 6, height: 14 }}
                   />
                   <button
                     className="px-3 py-1 bg-sky-600 text-white rounded"
@@ -1268,54 +1268,49 @@ export default function App() {
                       <div>
                         <strong style={{ color: '#432ecaff' }}>SRP close confirm/reject by ±{ (indexOhlc?.avg_val/4).toFixed(2) } pts:</strong>
                       </div>
-                      <div className="flex justify-between flex-wrap text-sm text-gray-700">
-                        {/* Resistance Column */}
-                        <div className="flex justify-between space-x-4"> 
-                            <div className="flex-1 space-y-0">
-                              <strong style={{ marginLeft: 12 }}>
-                                Resistance2 (Nx S1):
-                                <span style={{ color: lastPlusAvg2 == null ? "inherit" : (lastPlusAvg2 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
-                                  { lastPlusAvg2 == null ? "-" : lastPlusAvg2.toFixed(2) } { " - " + roundToNearest(lastPlusAvg2, ROUNDING_MULTIPLE) }
-                                </span>
-                              </strong>
-                            </div>
-                            <div className="flex-1 space-y-0">
-                              <strong style={{ marginLeft: 12 }}>
-                                Resistance1 (Nx S2):
-                                <span style={{ color: lastPlusAvg1 == null ? "inherit" : (lastPlusAvg1 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
-                                  { lastPlusAvg1 == null ? "-" : lastPlusAvg1.toFixed(2) } { " - " + roundToNearest(lastPlusAvg1, ROUNDING_MULTIPLE) }
-                                </span>
-                              </strong>
-                            </div>
-                            <div className="flex-1 space-y-0">
-                              <strong style={{ marginLeft: 12, color: '#f07e14ff'}}>{'Spot (> Avg) Strike:'}</strong>
-                              <strong>
-                                <span style={{ color: indexOhlc?.last == null ? "inherit" : (indexOhlc?.last < avgStrike ? "red" : "green"), marginLeft: 6 }}>
-                                  { indexOhlc?.last ?? "-" } { " - " + roundToNearest(indexOhlc?.last, ROUNDING_MULTIPLE) }
-                                </span>
-                              </strong>
-                            </div>
-                        </div>
-                        {/* Support Column */}
-                        <div className="flex justify-between space-x-4">
-                            <div className="flex-1 space-y-0">
-                              <strong style={{ marginLeft: 12 }}>
-                                Support1 (Pv R2):
-                                <span style={{ color: lastMinusAvg1 == null ? "inherit" : (lastMinusAvg1 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
-                                  { lastMinusAvg1 == null ? "-" : lastMinusAvg1.toFixed(2) } { " - " + roundToNearest(lastMinusAvg1, ROUNDING_MULTIPLE) }
-                                </span>
-                              </strong>  
-                            </div>
-                            <div className="flex-1 space-y-0">                    
-                              <strong style={{ marginLeft: 12 }}>
-                                Support2 (Pv R1):
-                                <span style={{ color: lastMinusAvg2 == null ? "inherit" : (lastMinusAvg2 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
-                                  { lastMinusAvg2 == null ? "-" : lastMinusAvg2.toFixed(2) } { " - " + roundToNearest(lastMinusAvg2, ROUNDING_MULTIPLE) }
-                                </span>
-                              </strong>
-                            </div>
-                        </div>
+                      <div className="flex-1 space-y-0">
+                        <strong style={{ marginLeft: 12 }}>
+                          Resistance2 (Nx S1):
+                          <span style={{ color: lastPlusAvg2 == null ? "inherit" : (lastPlusAvg2 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
+                            { lastPlusAvg2 == null ? "-" : lastPlusAvg2.toFixed(2) } { " - " + roundToNearest(lastPlusAvg2, ROUNDING_MULTIPLE) }
+                          </span>
+                        </strong>
                       </div>
+                      <div className="flex-1 space-y-0">
+                        <strong style={{ marginLeft: 12 }}>
+                          Resistance1 (Nx S2):
+                          <span style={{ color: lastPlusAvg1 == null ? "inherit" : (lastPlusAvg1 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
+                            { lastPlusAvg1 == null ? "-" : lastPlusAvg1.toFixed(2) } { " - " + roundToNearest(lastPlusAvg1, ROUNDING_MULTIPLE) }
+                          </span>
+                        </strong>
+                      </div>
+                      <div className="flex-1 space-y-0">
+                        <strong style={{ marginLeft: 12, color: '#f07e14ff'}}>{'Spot (> Avg) Strike:'}</strong>
+                        <strong>
+                          <span style={{ color: indexOhlc?.last == null ? "inherit" : (indexOhlc?.last < avgStrike ? "red" : "green"), marginLeft: 6 }}>
+                            { indexOhlc?.last ?? "-" } { " - " + roundToNearest(indexOhlc?.last, ROUNDING_MULTIPLE) }
+                          </span>
+                        </strong>
+                      </div>
+
+                      {/* Support Column */}
+                      <div className="flex-1 space-y-0">
+                        <strong style={{ marginLeft: 12 }}>
+                          Support1 (Pv R2):
+                          <span style={{ color: lastMinusAvg1 == null ? "inherit" : (lastMinusAvg1 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
+                            { lastMinusAvg1 == null ? "-" : lastMinusAvg1.toFixed(2) } { " - " + roundToNearest(lastMinusAvg1, ROUNDING_MULTIPLE) }
+                          </span>
+                        </strong>  
+                      </div>
+                      <div className="flex-1 space-y-0">                    
+                        <strong style={{ marginLeft: 12 }}>
+                          Support2 (Pv R1):
+                          <span style={{ color: lastMinusAvg2 == null ? "inherit" : (lastMinusAvg2 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
+                            { lastMinusAvg2 == null ? "-" : lastMinusAvg2.toFixed(2) } { " - " + roundToNearest(lastMinusAvg2, ROUNDING_MULTIPLE) }
+                          </span>
+                        </strong>
+                      </div>
+
                       <div style={{ marginTop: 8 }}>
                           <span className="text-xs text-gray-500">{'Entry at ±SPOT means Nifty should move ±CLOSE pts. --> Is it possible to take Entry?'}</span>
                       </div>
@@ -1328,7 +1323,7 @@ export default function App() {
                       <strong>Advance: 
                         <span style={{ color: marketStats?.advance == null ? "inherit" : (marketStats?.advance < marketStats?.decline ? "red" : "green") }}>
                           { marketStats?.advance == null ? "-" : marketStats?.advance }
-                        </span> 
+                        </span>
                       </strong>
                     </div>
                     <div>
@@ -1414,7 +1409,7 @@ export default function App() {
                 background: "#fff",
               }}
             >
-              <h3 style={{ marginTop: 0 }}>Underlying Candles:</h3>
+              <h3 style={{ marginTop: 0 }}>Underlying Candles</h3>
               <div>
                 {/* optionally show the raw indexOhlc for debug */}
                 {/*<pre style={{fontSize:12}}>{indexOhlc ? JSON.stringify(indexOhlc, null, 2) : "indexOhlc: loading..."}</pre>*/}
@@ -1636,6 +1631,8 @@ export default function App() {
             </table>
           </div>
         </div>
+        
+        <OptionsGreeks initialAtmStrike={ 25300 }/>
 
         <div style={{ marginTop: 12, color: "#6b7280" }}>
           Rows: {rows.length} • Filtered: {filtered.length}

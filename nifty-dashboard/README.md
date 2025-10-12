@@ -29,6 +29,7 @@ scaffold for the NIFTY OI / PCR dashboard. The project is structured to run with
 5. Debug and log check.
    ```
    docker compose logs --tail=200 frontend
+   docker compose logs --tail=200 backend
    curl -s http://localhost:8000/api/nifty/window_stats | jq .[0]
    ```
 

@@ -241,52 +241,54 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
             padding: 12,
             background: "#fff"
         }}>
-            <h3 style={{ marginTop: 0 }}>Support - Resistance Table</h3>
-            {pivotData ? (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                    <thead>
-                    <tr>
-                        <th style={{ textAlign: "left", padding: 6 }}>Zone</th>
-                        <th style={{ textAlign: "left", padding: 6 }}>Index</th>
-                        <th style={{ textAlign: "left", padding: 6 }}>Pivot Gap (Index − CP)</th>
-                        <th style={{ textAlign: "left", padding: 6 }}>Pivot Difference (Last - Index)</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                        {/*{["S3","S2","S1","CP","R1","R2","R3"].map((z) => {*/}
-                        {["R3","R2","R1","CP","S1","S2","S3"].map((z) => {
-                            const level = pivotData[z === "CP" ? "P" : z];
-                            const gap = pivotData?.gap?.[z];
-                            const pd = pivotData?.pivotDiff?.[z];
-
-                            // highlight CP row
-                            const rowStyle = z === "CP"
-                            ? { background: "#fff7ed", fontWeight: 600 } // light orange, bold
-                            : {};
-
-                            return (
-                                <tr key={z} style={rowStyle}>
-                                    <td style={{ padding: 8, fontWeight: 600 }}>{z}</td>
-                                    <td style={{ padding: 8 }}>{ level == null ? "—" : fmtFixed(level, 2) }</td>
-                                    {/*<td style={{ padding: 8 }}>{ gap == null ? "—" : fmtNum(gap, 2) }</td>
-                                    <td style={{ padding: 8 }}>{ pd == null ? "—" : fmtNum(pd, 2) }</td>*/}
-                                    <td style={{ padding: 8 }}>{ gap == null ? "—" : gap.toFixed(2) }</td>
-                                    <td style={{ padding: 8 }}>{ pd == null ? "—" : pd.toFixed(2) }</td>
-                                </tr>
-                            );
-                        })}
-
+            <div className="bg-white p-4 rounded-xl shadow-lg w-full max-w-sm border border-gray-300">
+                <h3 className="text-xl font-bold mb-3 border-b pb-2 text-gray-700" style={{ marginTop: 0 }}>Support - Resistance Table</h3>
+                {pivotData ? (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                        <thead>
                         <tr>
-                            <td style={{ padding: 8 }}>Momentum:</td>
-                            <td style={{ padding: 8 }}>{pivotData?.momentum.toFixed(2) ?? "—"}</td>
-                            <td style={{ padding: 8 }}></td>
-                            <td style={{ padding: 8 }}></td>
+                            <th style={{ textAlign: "left", padding: 6 }}>Zone</th>
+                            <th style={{ textAlign: "left", padding: 6 }}>Index</th>
+                            <th style={{ textAlign: "left", padding: 6 }}>Pivot Gap (Index − CP)</th>
+                            <th style={{ textAlign: "left", padding: 6 }}>Pivot Difference (Last - Index)</th>
                         </tr>
-                    </tbody>
-                </table>
-            ) : (
-                <div style={{ color: "#666" }}>Index OHLC required for pivot calculation</div>
-            )}
+                        </thead>
+                        <tbody>
+                            {/*{["S3","S2","S1","CP","R1","R2","R3"].map((z) => {*/}
+                            {["R3","R2","R1","CP","S1","S2","S3"].map((z) => {
+                                const level = pivotData[z === "CP" ? "P" : z];
+                                const gap = pivotData?.gap?.[z];
+                                const pd = pivotData?.pivotDiff?.[z];
+
+                                // highlight CP row
+                                const rowStyle = z === "CP"
+                                ? { background: "#fff7ed", fontWeight: 600 } // light orange, bold
+                                : {};
+
+                                return (
+                                    <tr key={z} style={rowStyle}>
+                                        <td style={{ padding: 8, fontWeight: 600 }}>{z}</td>
+                                        <td style={{ padding: 8 }}>{ level == null ? "—" : fmtFixed(level, 2) }</td>
+                                        {/*<td style={{ padding: 8 }}>{ gap == null ? "—" : fmtNum(gap, 2) }</td>
+                                        <td style={{ padding: 8 }}>{ pd == null ? "—" : fmtNum(pd, 2) }</td>*/}
+                                        <td style={{ padding: 8 }}>{ gap == null ? "—" : gap.toFixed(2) }</td>
+                                        <td style={{ padding: 8 }}>{ pd == null ? "—" : pd.toFixed(2) }</td>
+                                    </tr>
+                                );
+                            })}
+
+                            <tr>
+                                <td style={{ padding: 8 }}>Momentum:</td>
+                                <td style={{ padding: 8 }}>{pivotData?.momentum.toFixed(2) ?? "—"}</td>
+                                <td style={{ padding: 8 }}></td>
+                                <td style={{ padding: 8 }}></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                ) : (
+                    <div style={{ color: "#666" }}>Index OHLC required for pivot calculation</div>
+                )}
+            </div>
         </div>
         
         {/* <div><pre>{ JSON.stringify(prevIndexOhlc, null, 2) }</pre></div> */}

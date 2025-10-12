@@ -141,7 +141,7 @@ export default function LiveSRPLevelPlot ({ spot, r2, r1, s1, s2 }) {
   };
 
   return (
-    <div className="bg-white p-4 rounded-xl shadow-lg w-full max-w-sm border border-gray-300">
+    <div className="bg-white p-4 rounded-xl shadow-lg w-full max-w-sm-80 border border-gray-300">
       <h3 className="text-xl font-bold mb-3 border-b pb-2 text-gray-700">SRP Level Visualization</h3>
       <div style={{ width: '100%', height: 250 }}>
         <ResponsiveContainer width="100%" height="100%">

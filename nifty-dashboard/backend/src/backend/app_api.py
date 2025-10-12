@@ -1,5 +1,7 @@
 # app_api.py
 import pandas as pd, os, json, requests, sys
+import configparser, datetime as dt
+import json
 from flask import jsonify, request, current_app as app
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -370,6 +372,106 @@ def market_stats():
         pass
 
     return jsonify({"advance": adv, "decline": dec, "raw": j}), 200
+
+# --- Configuration Reading Option Greeks ---
+CONFIG_PATH = os.getenv("CONFIG_PATH", "/app/config.ini")
+config = configparser.ConfigParser()
+config.read(CONFIG_PATH)
+
+# --- Read config (fail fast if critical values missing) ---
+def read_config():
+    try:
+        api_url = config.get('API', 'url', fallback='https://api.upstox.com/v2/option/chain')
+        bearer_token = config.get('API', 'bearer_token')
+        instrument_key = config.get('NIFTY', 'instrument_key', fallback='NSE_INDEX|Nifty 50')
+        expiry_date = config.get('NIFTY', 'expiry_date', fallback=None)
+        atm_strike = config.getint('NIFTY', 'atm_strike', fallback=None)
+    except configparser.Error as e:
+        raise RuntimeError(f"Error reading config.ini: {e}")
+
+    if not bearer_token or bearer_token in ('CONFIG_ERROR_TOKEN', 'YOUR_TOKEN_HERE'):
+        raise RuntimeError("Missing/invalid BEARER_TOKEN. Refresh or set a valid access token.")
+
+    return api_url, bearer_token, instrument_key, expiry_date, atm_strike
+
+def next_thursday(date):
+    # Upstox weekly index options typically expire on Thursday (adjust to market rules/holidays as needed)
+    # Return the next Thursday >= today
+    days_ahead = (3 - date.weekday()) % 7  # 3 = Thursday
+    return date + dt.timedelta(days=days_ahead)
+
+@app.route('/api/option-chain', methods=['GET'])
+def get_option_chain():
+    try:
+        print(f"in backend...", flush=True)
+        dynamic_atm_strike = request.args.get('atm_strike')
+        if dynamic_atm_strike:
+            try:
+                # Convert to integer for use in logic, if valid
+                ATM_STRIKE = int(dynamic_atm_strike)
+                print(f"INFO: Using dynamic ATM strike from frontend: {ATM_STRIKE}", flush=True)
+                UPSTOX_API_URL, BEARER_TOKEN, INSTRUMENT_KEY, EXPIRY_CFG, _ = read_config()
+            except ValueError:
+                print(f"WARNING: Invalid dynamic strike '{dynamic_atm_strike}'. Falling back to read static atmStrike from config.ini", flush=True)
+                UPSTOX_API_URL, BEARER_TOKEN, INSTRUMENT_KEY, EXPIRY_CFG, ATM_STRIKE = read_config()
+                print(f"in backend...", flush=True)
+        else:
+            print(f"INFO: Dynamic strike not provided or empty. Using default from config.ini", flush=True)
+            UPSTOX_API_URL, BEARER_TOKEN, INSTRUMENT_KEY, EXPIRY_CFG, ATM_STRIKE = read_config()
+    except RuntimeError as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+    # Allow frontend overrides via querystring: /api/option-chain?expiry_date=YYYY-MM-DD&instrument_key=...
+    instrument_key = request.args.get('instrument_key', INSTRUMENT_KEY)
+    expiry_date = request.args.get('expiry_date', EXPIRY_CFG)
+
+    # If no expiry supplied anywhere, choose a sensible default (next Thursday)
+    if not expiry_date:
+        expiry_date = next_thursday(dt.date.today()).strftime('%Y-%m-%d')
+
+    params = {
+        'instrument_key': instrument_key,
+        'expiry_date': expiry_date
+    }
+    headers = {
+        'Content-Type': 'application/json', 
+        'Accept': 'application/json', 
+        'Authorization': f'Bearer {BEARER_TOKEN}' 
+    }
+
+    try:
+        resp = requests.get(UPSTOX_API_URL, params=params, headers=headers, timeout=10)
+        if resp.status_code == 401:
+            return jsonify({
+                'status': 'error',
+                'message': 'Upstox auth failed (401). Your access token is missing/invalid/expired. '
+                           'Generate a fresh token after 03:30 IST or use refresh_token.'
+            }), 401
+
+        # Bubble up other HTTP errors with details
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError:
+            return jsonify({'status': 'error',
+                            'message': f'Upstox error {resp.status_code}',
+                            'details': resp.text}), resp.status_code
+
+        data = resp.json()
+        if data.get('status') == 'success' and 'data' in data:
+            return jsonify({
+                'status': 'success',
+                'atm_strike': ATM_STRIKE,
+                'data': data['data']
+            })
+        else:
+            return jsonify({'status': 'error',
+                            'message': 'Unexpected Upstox response format',
+                            'details': data}), 502
+
+    except requests.RequestException as e:
+        return jsonify({'status': 'error', 'message': f'Network error talking to Upstox: {e}'}), 502
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Unexpected server error: {e}'}), 500
     
 if __name__ == "__main__":
     os.makedirs('data', exist_ok=True)
