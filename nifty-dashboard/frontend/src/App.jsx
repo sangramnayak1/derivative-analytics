@@ -750,9 +750,22 @@ export default function App() {
     return { avgStrike, lastMinusAvg1, lastMinusAvg2, lastPlusAvg1, lastPlusAvg2 };
   }, [indexOhlc]);
 
+  const { prevAvgStrike, prevLastMinusAvg1, prevLastMinusAvg2, prevLastPlusAvg1, prevLastPlusAvg2 } = useMemo(() => {
+    if (!prevIndexOhlc) return { prevIndexOhlc: null, prevLastMinusAvg1: null, prevLastMinusAvg2: null, prevLastPlusAvg1: null, prevLastPlusAvg2:null };
+    const prevHigh = Number(prevIndexOhlc?.high ?? NaN);
+    const prevAvg  = Number(prevIndexOhlc?.avgPts ?? NaN);
+    const prevLast = Number(prevIndexOhlc?.close ?? NaN);
+    const prevAvgStrike = Number.isFinite(prevHigh) && Number.isFinite(prevAvg) ? (prevHigh - prevAvg) : null;
+    const prevLastMinusAvg1 = Number.isFinite(prevLast) && Number.isFinite(prevAvg) ? (prevLast - prevAvg/2) : null;
+    const prevLastMinusAvg2 = Number.isFinite(prevLast) && Number.isFinite(prevAvg) ? (prevLast - prevAvg) : null;
+    const prevLastPlusAvg1 = Number.isFinite(prevLast) && Number.isFinite(prevAvg) ? (prevLast + prevAvg/2) : null;
+    const prevLastPlusAvg2 = Number.isFinite(prevLast) && Number.isFinite(prevAvg) ? (prevLast + prevAvg) : null;
+    return { prevAvgStrike, prevLastMinusAvg1, prevLastMinusAvg2, prevLastPlusAvg1, prevLastPlusAvg2 };
+  }, [prevIndexOhlc]);
+
   // chart options
   const candleOptions = useMemo(() => ({
-    chart: { type: "candlestick", height: 360, animations: { enabled: false }, toolbar: { show: true } },
+    chart: { type: "candlestick", height: 360, animations: { enabled: false }, zoom: { enabled: false }, toolbar: { show: true } },
     title: { text: "Underlying Candles (snapshot)", align: "left" },
     xaxis: {
       type: "datetime",
@@ -1202,8 +1215,8 @@ export default function App() {
                       )}
                     </div>
                     <div>
-                      <strong>{'Last > Avg by:'}</strong>{" "}
-                        <span style={{ color: indexOhlc == null ? "inherit" : (indexOhlc?.close < (indexOhlc?.last - avgStrike) ? "red" : "green"), fontWeight: 600 }}>
+                      <strong>{'Last - Avg:'}</strong>{" "}
+                        <span style={{ color: indexOhlc == null ? "inherit" : (indexOhlc?.close < 0 ? "red" : "green"), fontWeight: 600 }}>
                           { indexOhlc?.close == null ? "-" : (indexOhlc?.last - avgStrike).toFixed(2) }{" pts"}
                         </span>
                     </div>
@@ -1297,7 +1310,7 @@ export default function App() {
                       <div className="flex-1 space-y-0">
                         <strong style={{ marginLeft: 12 }}>
                           Support1 (Pv R2):
-                          <span style={{ color: lastMinusAvg1 == null ? "inherit" : (lastMinusAvg1 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
+                          <span style={{ color: lastMinusAvg1 == null ? "inherit" : (lastMinusAvg1 > indexOhlc?.last ? "red" : "green"), marginLeft: 6 }}>
                             { lastMinusAvg1 == null ? "-" : lastMinusAvg1.toFixed(2) } { " - " + roundToNearest(lastMinusAvg1, ROUNDING_MULTIPLE) }
                           </span>
                         </strong>  
@@ -1305,30 +1318,33 @@ export default function App() {
                       <div className="flex-1 space-y-0">                    
                         <strong style={{ marginLeft: 12 }}>
                           Support2 (Pv R1):
-                          <span style={{ color: lastMinusAvg2 == null ? "inherit" : (lastMinusAvg2 < indexOhlc?.last ? "green" : "red"), marginLeft: 6 }}>
+                          <span style={{ color: lastMinusAvg2 == null ? "inherit" : (lastMinusAvg2 > indexOhlc?.last ? "red" : "green"), marginLeft: 6 }}>
                             { lastMinusAvg2 == null ? "-" : lastMinusAvg2.toFixed(2) } { " - " + roundToNearest(lastMinusAvg2, ROUNDING_MULTIPLE) }
                           </span>
                         </strong>
                       </div>
 
                       <div style={{ marginTop: 8 }}>
-                          <span className="text-xs text-gray-500">{'Entry at ±SPOT means Nifty should move ±CLOSE pts. --> Is it possible to take Entry?'}</span>
+                          <span className="text-xs text-gray-500">{'Entry at ±SPOT means Nifty should move about ±CLOSE pts. --> Is it possible to take Entry?'}</span>
                       </div>
                     </div>
 
-                    <div className="text-xs text-gray-500" style={{ marginTop: 8 }}>
-                      Polling: {pollMs ? `${pollMs / 1000}s` : "Manual"}
+                    <div style={{ marginTop: 8 }}>
+                      <strong>Polling:</strong>
+                      <span>{" "}
+                        {pollMs ? `${pollMs / 1000}s` : "Manual"}
+                      </span>
                     </div>
                     <div>
                       <strong>Advance: 
-                        <span style={{ color: marketStats?.advance == null ? "inherit" : (marketStats?.advance < marketStats?.decline ? "red" : "green") }}>
+                        <span style={{ color: marketStats?.advance == null ? "inherit" : (marketStats?.advance < marketStats?.decline ? "red" : "green") }}>{" "}
                           { marketStats?.advance == null ? "-" : marketStats?.advance }
                         </span>
                       </strong>
                     </div>
                     <div>
                       <strong>Decline: 
-                        <span style={{ color: marketStats?.decline == null ? "inherit" : (marketStats?.decline < marketStats?.advance ? "red" : "green") }}>
+                        <span style={{ color: marketStats?.decline == null ? "inherit" : (marketStats?.decline < marketStats?.advance ? "red" : "green") }}>{" "}
                           { marketStats?.decline == null ? "-" : marketStats?.decline }
                         </span> 
                       </strong>
@@ -1376,28 +1392,58 @@ export default function App() {
             
             {/* Live SRP Level Visualization */}
             <div
-            style={{
-              marginTop: 18,
-              padding: 12,
-              border: "1px solid #e5e7eb",
-              borderRadius: 6,
-              background: "#fff",
+              style={{
+                marginTop: 18,
+                padding: 12,
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                background: "#fff",
               }}
             >
-            {/* show placeholder until indexOhlc is available */}
-            {indexOhlc ? (
-              <LiveSRPLevelPlot 
-                spot={indexOhlc?.last}
-                r2={lastPlusAvg2}
-                r1={lastPlusAvg1}
-                s1={lastMinusAvg1}
-                s2={lastMinusAvg2}
-              />
-            ) : (
-                <div style={{ padding: 12, color: "#666" }}>
-                  Loading Live SRP Level…
-                </div>
-              )}
+              <h3 className="text-xl font-bold mb-3 pb-2 text-gray-700">Today Live</h3>
+              {/* show placeholder until indexOhlc is available */}
+              {indexOhlc ? (
+                <LiveSRPLevelPlot 
+                  spot={avgStrike}
+                  r2={lastPlusAvg2}
+                  r1={lastPlusAvg1}
+                  cp={lastPlusAvg1 - (lastPlusAvg1 - lastMinusAvg1)/2}
+                  s1={lastMinusAvg1}
+                  s2={lastMinusAvg2}
+                />
+              ) : (
+                  <div style={{ padding: 12, color: "#666" }}>
+                    Loading Live SRP Level…
+                  </div>
+                )}
+            </div>
+
+            {/* Previous SRP Level Visualization */}
+            <div
+              style={{
+                marginTop: 18,
+                padding: 12,
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                background: "#fff",
+              }}
+            >
+              <h3 className="text-xl font-bold mb-3 pb-2 text-gray-700">Previous Day</h3>
+              {/* show placeholder until indexOhlc is available */}
+              {prevIndexOhlc ? (
+                <LiveSRPLevelPlot 
+                  spot={avgStrike}
+                  r2={prevLastPlusAvg2}
+                  r1={prevLastPlusAvg1}
+                  cp={prevLastPlusAvg1 - (prevLastPlusAvg1 - prevLastMinusAvg1)/2}
+                  s1={prevLastMinusAvg1}
+                  s2={prevLastMinusAvg2}
+                />
+              ) : (
+                  <div style={{ padding: 12, color: "#666" }}>
+                    Loading Previous SRP Level…
+                  </div>
+                )}
             </div>
 
             <div
@@ -1409,7 +1455,7 @@ export default function App() {
                 background: "#fff",
               }}
             >
-              <h3 style={{ marginTop: 0 }}>Underlying Candles</h3>
+              {/*<h3 style={{ marginTop: 0 }}>Underlying Candles</h3>*/}
               <div>
                 {/* optionally show the raw indexOhlc for debug */}
                 {/*<pre style={{fontSize:12}}>{indexOhlc ? JSON.stringify(indexOhlc, null, 2) : "indexOhlc: loading..."}</pre>*/}
@@ -1420,6 +1466,7 @@ export default function App() {
                   height={320}
                 />
               </div>
+              <p className="font-bold text-center text-xs text-blue-700 mt-2">Momentum: {safeNum(indexOhlc?.momentum ?? "-", 2)}</p>
             </div>
           </div>
         </div>
@@ -1633,7 +1680,7 @@ export default function App() {
         </div>
         
         <OptionsGreeks 
-          initialAtmStrike={ 25300 }
+          initialAtmStrike={ indexOhlc?.last }
           expMove={ 100 }
         />
 

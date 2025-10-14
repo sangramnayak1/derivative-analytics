@@ -9,7 +9,7 @@ import {
 } from "recharts";
 
 // Helper component to visualize the Spot vs. SRP Levels
-export default function LiveSRPLevelPlot ({ spot, r2, r1, s1, s2 }) {
+export default function LiveSRPLevelPlot ({ spot, r2, r1, cp, s1, s2 }) {
   // We use a dummy data array to force Recharts to render. The Y-values come from ReferenceLines.
   const data = [{ x: 1, value: spot }];
   
@@ -17,6 +17,7 @@ export default function LiveSRPLevelPlot ({ spot, r2, r1, s1, s2 }) {
   const allValues = [spot, r2, r1, s1, s2].filter(v => v !== null);
   if (allValues.length === 0) return <p className="text-gray-500 text-center">No plot data.</p>;
 
+  const cpVal = (r1 - s1)/2;
   const minVal = Math.min(...allValues);
   const maxVal = Math.max(...allValues);
   const range = maxVal - minVal;
@@ -26,8 +27,9 @@ export default function LiveSRPLevelPlot ({ spot, r2, r1, s1, s2 }) {
 
   // Colors and line properties
   const spotColor = '#3B82F6'; // '#f07e14ff' '#10B981'; // Tailwind green-500
-  const resistanceColor = '#EF4444'; // Tailwind red-500
   const supportColor = '#10B981'; // '#12be4bff' '#3B82F6'; // Tailwind blue-500
+  const resistanceColor = '#EF4444'; // Tailwind red-500
+  const pivotColor = '#6f0cf1ff';
 
   // --- Custom Spot Label Component (The new square box) ---
   const CustomSpotLabel = (props) => {
@@ -143,6 +145,10 @@ export default function LiveSRPLevelPlot ({ spot, r2, r1, s1, s2 }) {
   return (
     <div className="bg-white p-4 rounded-xl shadow-lg w-full max-w-sm-80 border border-gray-300">
       <h3 className="text-xl font-bold mb-3 border-b pb-2 text-gray-700">SRP Level Visualization</h3>
+      <div>
+        <p className="font-bold text-right text-xs text-green-700 mt-2">Spot @ Resistance = Bullish side / CALL Buy's Profit Booking Zone</p>
+        <p style={{color: '#EF4444'}} className="text-l font-bold text-right text-xs text-red-700 mt-2">[ PUT Entry ]</p>
+      </div>
       <div style={{ width: '100%', height: 250 }}>
         <ResponsiveContainer width="100%" height="100%">
           {/* Right margin increased to 80 to make space for both the price and the label text on the right side */}
@@ -176,6 +182,15 @@ export default function LiveSRPLevelPlot ({ spot, r2, r1, s1, s2 }) {
                 content={null} 
             />
             
+            {/* --- Pivot Lines (Blue) --- */}
+            <ReferenceLine 
+              y={cp} 
+              stroke={pivotColor} 
+              strokeDasharray="3 3" 
+              strokeWidth={2} 
+              label={<FullLevelLabel value={cp} label="CP" color={pivotColor} />}
+            />
+
             {/* --- Support Lines (Blue) --- */}
             <ReferenceLine 
               y={s1} 
@@ -194,7 +209,12 @@ export default function LiveSRPLevelPlot ({ spot, r2, r1, s1, s2 }) {
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-center text-xs text-gray-500 mt-2">Green: Spot | Red: Resistance | Blue: Support</p>
+      <div>
+        <p style={{color: '#10B981'}} className="text-l font-bold text-right text-xs text-green-700 mt-2">[ CALL Entry ]</p>
+        <p className="font-bold text-right text-xs text-red-700 mt-2">Spot @ Support = Bearish side / Put Buy's Profit Booking Zone</p>
+        <p className="font-bold text-center text-s text-red-700 mt-2">CP = {cpVal.toFixed(2)}</p>
+      </div>
+      <p className="text-center text-xs text-gray-700 mt-2">Green: Spot | Red: Resistance | Blue: Support</p>
     </div>
   );
 };
