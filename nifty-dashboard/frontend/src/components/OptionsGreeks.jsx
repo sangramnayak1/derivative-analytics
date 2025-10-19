@@ -18,15 +18,16 @@ const LOCAL_API_URL = 'http://localhost:8000/api/option-chain';
 // --- Main OptionGreeks Component ---
 // Accepts initialAtmStrike from a parent component (App.jsx)
 const OptionGreeks = ({ initialAtmStrike, expMove }) => {
-  
+  console.log("initialAtmStrike = " + initialAtmStrike);
+
   const [optionsData, setOptionsData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   //const [atmStrike, setAtmStrike] = useState(initialAtmStrike ? Number(initialAtmStrike) : INITIAL_ATM_STRIKE);
   const initialValue = initialAtmStrike ? Number(initialAtmStrike) : INITIAL_ATM_STRIKE;
-  console.log("issss = " + initialAtmStrike)
+  console.log("initialAtmStrike = " + initialValue)
   const safeAtmStrike = isNaN(initialValue) ? INITIAL_ATM_STRIKE : initialValue;
-  const [atmStrike, setAtmStrike] = useState(safeAtmStrike);
+  const [atmStrike, setAtmStrike] = useState(initialAtmStrike ? Number(safeAtmStrike) : INITIAL_ATM_STRIKE);
   console.log("atmStrike = " + atmStrike)
 
   const { requiredStrikes } = useMemo(() => {

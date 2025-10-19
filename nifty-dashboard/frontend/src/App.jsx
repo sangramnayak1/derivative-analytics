@@ -682,7 +682,8 @@ export default function App() {
 
     const prevCloseVal = Number.isFinite(prev) ? prev : open; // fallback
 
-    const prevCandle = { x: prevTs, y: [prevCloseVal, prevCloseVal, prevCloseVal, prevCloseVal] };
+    //const prevCandle = { x: prevTs, y: [prevCloseVal, prevCloseVal, prevCloseVal, prevCloseVal] };
+    const prevCandle = { x: prevTs, y: [prevIndexOhlc?.open, prevIndexOhlc?.high, prevIndexOhlc?.low, prevIndexOhlc?.close] };
     const currCandle = { x: ts,       y: [open, high, low, close] };
 
     return [{ data: [prevCandle, currCandle] }];
@@ -883,7 +884,7 @@ export default function App() {
                 background: "#fff",
               }}
             >
-              <div style={{ fontSize: 12, color: "#6b7280" }}>Underlying</div>
+              <div style={{ fontSize: 16, color: "#6b7280" }}>Underlying</div>
               <div style={{ fontSize: 24, fontWeight: 600 }}>
                 {underlying ?? "-"}
               </div>
@@ -1065,7 +1066,7 @@ export default function App() {
                   background: "#fff",
                 }}
               >
-                <h3 style={{ marginTop: 0 }}>OI Profile (CE vs PE)</h3>
+                <h3 style={{ marginTop: 0 }} className="text-xl font-bold mb-3 pb-2 text-gray-700">OI Profile (CE vs PE)</h3>
                 <div style={{ width: "100%", height: 320 }}>
                   <ResponsiveContainer>
                     <ComposedChart data={oiProfileData}>
@@ -1096,7 +1097,7 @@ export default function App() {
                     borderRadius: 6,
                   }}
                 >
-                  <h3 className="font-medium">Window Summary</h3>
+                  <h3 className="text-xl font-bold mb-3 pb-2 text-gray-700">Window Summary</h3>
                   <div className="text-sm">
                     <div>
                       <strong>ATM:</strong> {stats?.atm ?? "-"}
@@ -1363,7 +1364,7 @@ export default function App() {
                 background: "#fff",
               }}
             >
-              <h3 style={{ marginTop: 0 }}>OI by Expiry (stacked area)</h3>
+              <h3 style={{ marginTop: 0 }} className="text-xl font-bold mb-3 pb-2 text-gray-700">OI by Expiry (stacked area)</h3>
               <div style={{ width: "100%", height: 220 }}>
                 <ResponsiveContainer>
                   <AreaChart data={expiryAreaData}>
@@ -1466,7 +1467,10 @@ export default function App() {
                   height={320}
                 />
               </div>
-              <p className="font-bold text-center text-xs text-blue-700 mt-2">Momentum: {safeNum(indexOhlc?.momentum ?? "-", 2)}</p>
+              <p>
+                <span className="font-bold text-left text-xs text-orange-700 mt-2" style={{ marginLeft: '50px', marginRight: '50px' }}>Momentum Yesterday: {safeNum(prevIndexOhlc?.momentumPts ?? "-", 2)}</span>{"  "}
+                <span className="font-bold text-right text-xs text-blue-700 mt-2">Momentum Today: {safeNum(indexOhlc?.momentum ?? "-", 2)}</span>
+              </p>
             </div>
           </div>
         </div>
@@ -1505,7 +1509,7 @@ export default function App() {
             background: "#fff",
           }}
         >
-          <h2>Strike Table</h2>
+          <h3 className="text-xl font-bold mb-3 pb-2 text-gray-700">Strike Table</h3>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead style={{ background: "#f3f4f6" }}>
@@ -1680,8 +1684,8 @@ export default function App() {
         </div>
         
         <OptionsGreeks 
-          initialAtmStrike={ indexOhlc?.last }
-          expMove={ 100 }
+          initialAtmStrike={indexOhlc?.last}
+          expMove={100}
         />
 
         <div style={{ marginTop: 12, color: "#6b7280" }}>

@@ -55,7 +55,7 @@ const DEFAULT_MOVE = 40;
 export const STEP_SIZE = 50;
 export const DOWN_STEPS = 10;
 export const UP_STEPS = 11;
-export const INITIAL_ATM_STRIKE = 25250; 
+export const INITIAL_ATM_STRIKE = 25600; 
 
 export const MOCK_STRIKE_LIST = generateStrikeList(INITIAL_ATM_STRIKE, DOWN_STEPS, UP_STEPS, STEP_SIZE);
 // Target move is +100

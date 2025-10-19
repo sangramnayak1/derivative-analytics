@@ -242,7 +242,7 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
             background: "#fff"
         }}>
             <div className="bg-white p-4 rounded-xl shadow-lg w-full max-w-sm border border-gray-300">
-                <h3 className="text-xl font-bold mb-3 border-b pb-2 text-gray-700" style={{ marginTop: 0 }}>Support - Resistance Table</h3>
+                <h3 style={{ marginTop: 0 }} className="text-xl font-bold mb-3 pb-2 text-gray-700">Support - Resistance Table</h3>
                 {pivotData ? (
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                         <thead>
@@ -366,21 +366,21 @@ export default function PivotPcrTables({ indexOhlc = {}, prevIndexOhlc = null, s
             padding: 12,
             background: "#fff"
             }}>
-            <h3 style={{ marginTop: 0 }}>PCR Table</h3>
+            <h3 style={{ marginTop: 0 }} className="text-xl font-bold mb-3 pb-2 text-gray-700">PCR Table</h3>
 
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                 <thead>
                 <tr>
-                    <th style={{ textAlign: "left", padding: 6 }}>RANGE</th>
-                    <th style={{ textAlign: "left", padding: 6 }}>CE Range</th>   {/* new */}
-                    <th style={{ textAlign: "left", padding: 6 }}>PE Range</th>   {/* new */}
-                    <th style={{ textAlign: "right", padding: 6 }}>CE OI</th>
-                    <th style={{ textAlign: "right", padding: 6 }}>PE OI</th>
-                    <th style={{ textAlign: "left", padding: 6 }}>CE OI Chng</th>
-                    <th style={{ textAlign: "left", padding: 6 }}>PE OI Chng</th>
-                    <th style={{ textAlign: "right", padding: 6 }}>CE Vol</th>   {/* new */}
-                    <th style={{ textAlign: "right", padding: 6 }}>PE Vol</th>   {/* new */}
-                    <th style={{ textAlign: "right", padding: 6 }}>PCR</th>
+                    <th style={{ textAlign: "left", padding: 6 }} className="px-2 py-2 text-s font-medium text-cyan-700 dark:text-cyan-300 uppercase tracking-wider font-extrabold bg-cyan-300 dark:bg-cyan-700">RANGE</th>
+                    <th style={{ textAlign: "left", padding: 6 }} className="px-2 py-2 text-s font-medium text-green-700 dark:text-green-300 uppercase tracking-wider font-extrabold bg-green-300 dark:bg-green-700">CE Range</th>   {/* new */}
+                    <th style={{ textAlign: "left", padding: 6 }} className="px-2 py-2 text-s font-medium text-red-700 dark:text-red-300 uppercase tracking-wider font-extrabold bg-red-300 dark:bg-red700">PE Range</th>   {/* new */}
+                    <th style={{ textAlign: "right", padding: 6 }} className="px-2 py-2 text-s font-medium text-green-700 dark:text-green-300 uppercase tracking-wider font-extrabold bg-green-300 dark:bg-green-700">CE OI</th>
+                    <th style={{ textAlign: "right", padding: 6 }} className="px-2 py-2 text-s font-medium text-red-700 dark:text-red-300 uppercase tracking-wider font-extrabold bg-red-300 dark:bg-red700">PE OI</th>
+                    <th style={{ textAlign: "left", padding: 6 }} className="px-2 py-2 text-s font-medium text-green-700 dark:text-green-300 uppercase tracking-wider font-extrabold bg-green-300 dark:bg-green-700">CE OI Chng</th>
+                    <th style={{ textAlign: "left", padding: 6 }} className="px-2 py-2 text-s font-medium text-red-700 dark:text-red-300 uppercase tracking-wider font-extrabold bg-red-300 dark:bg-red700">PE OI Chng</th>
+                    <th style={{ textAlign: "right", padding: 6 }} className="px-2 py-2 text-s font-medium text-green-700 dark:text-green-300 uppercase tracking-wider font-extrabold bg-green-300 dark:bg-green-700">CE Vol</th>   {/* new */}
+                    <th style={{ textAlign: "right", padding: 6 }} className="px-2 py-2 text-s font-medium text-red-700 dark:text-red-300 uppercase tracking-wider font-extrabold bg-red-300 dark:bg-red700">PE Vol</th>   {/* new */}
+                    <th style={{ textAlign: "right", padding: 6 }} className="px-2 py-2 text-s font-medium text-yellow-700 dark:text-yellow-300 uppercase tracking-wider font-extrabold bg-yellow-300 dark:bg-yellow-700">PCR</th>
                 </tr>
                 </thead>
                 <tbody>

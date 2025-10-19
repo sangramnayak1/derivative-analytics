@@ -23,7 +23,12 @@ export default function LiveSRPLevelPlot ({ spot, r2, r1, cp, s1, s2 }) {
   const range = maxVal - minVal;
   const buffer = range * 0.1; // 10% buffer for padding
 
-  const yDomain = [minVal - buffer, maxVal + buffer];
+  // Round to 2 decimal places
+  const roundedMin = (minVal - buffer).toFixed(0); // "9.50"
+  const roundedMax = (maxVal + buffer).toFixed(0); // "21.50"
+
+  // toFixed() returns a string, so you must convert it back to a number if needed
+  const yDomain = [parseFloat(roundedMin), parseFloat(roundedMax)];
 
   // Colors and line properties
   const spotColor = '#3B82F6'; // '#f07e14ff' '#10B981'; // Tailwind green-500
@@ -149,12 +154,12 @@ export default function LiveSRPLevelPlot ({ spot, r2, r1, cp, s1, s2 }) {
         <p className="font-bold text-right text-xs text-green-700 mt-2">Spot @ Resistance = Bullish side / CALL Buy's Profit Booking Zone</p>
         <p style={{color: '#EF4444'}} className="text-l font-bold text-right text-xs text-red-700 mt-2">[ PUT Entry ]</p>
       </div>
-      <div style={{ width: '100%', height: 250 }}>
+      <div style={{ width: '100%', height: 600 }}>
         <ResponsiveContainer width="100%" height="100%">
           {/* Right margin increased to 80 to make space for both the price and the label text on the right side */}
           <AreaChart data={data} margin={{ top: 10, right: 80, left: 10, bottom: 10 }}> 
             <XAxis dataKey="x" hide />
-            <YAxis domain={yDomain} hide />
+            <YAxis domain={yDomain} unhide tickCount={20}/>
             
             {/* --- Resistance Lines (Red) --- */}
             <ReferenceLine 
